@@ -8,5 +8,6 @@ Web Application per acquisire dati da dispositivo RuuviTag tramite [Noble.js](ht
 * [node-influx](https://github.com/node-influx/node-influx)
 
 # Compatibilità
-* node-influx compatibile solo con InfluxDB 1.x.x. L'ultima versione di InfluxDB disponibile per Windows è 1.8.4.
-* Noble.js su Windows richiede necessariamente un [dongle usb compatibile.](https://github.com/abandonware/node-bluetooth-hci-socket#windows) Maggiori informazioni sull'installazione si trovano sul Readme di Noble.js.
+* node-influx è compatibile solo con InfluxDB 1.x.x. L'ultima versione di InfluxDB disponibile per Windows è 1.8.4.
+* Noble.js su Windows richiede necessariamente un [dongle usb compatibile.](https://github.com/abandonware/node-bluetooth-hci-socket#windows) Maggiori informazioni sull'installazione si trovano nel Readme di Noble.js.
+* E' presente l'API [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource). EventSource non è compatibile con Internet Explorer.
