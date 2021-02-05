@@ -17,12 +17,15 @@ function explore() {
     }
   });
 
-  noble.on('scanStart', function() {
-    console.log("Scanning started.");
-    statusEmitter.emit('connecting');
-  });
+  // avoid to overcall 
+  if (first) {
+    noble.on('scanStart', function() {
+      console.log("Scanning started.");
+      statusEmitter.emit('connecting');
+    });
 
-  noble.on('discover', on_discovery);
+    noble.on('discover', on_discovery);
+  }
 }
 
 function on_discovery(peripheral) {
