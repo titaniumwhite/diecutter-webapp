@@ -99,7 +99,7 @@ function decode_data(data) {
 }
 
 async function reset() {
-  statusEmitter.emit('reset');
+  statusEmitter.emit('disconnected');
   console.log("Scanning stopped.");
   clearInterval(idInterval);
   clearInterval(idTimeout);

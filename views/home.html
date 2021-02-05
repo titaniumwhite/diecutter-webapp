@@ -10,8 +10,9 @@
             integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" 
             crossorigin="anonymous">
         <link rel="stylesheet" href="./css/main.css">
+        <script src="eventSource.js" type="text/javascript"></script>
     </head>
-    <body>
+    <body onload="reload();">
         
         <div class="container-fluid">
             <div class="row">              
@@ -32,6 +33,5 @@
 
         </div>
 
-        <script src="./eventSource.js"></script>
     </body>
 </html>

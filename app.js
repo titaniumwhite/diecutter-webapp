@@ -46,9 +46,9 @@ if (cluster.isMaster) {
       // tell the client to retry every 3 seconds if connectivity is lost
       res.write('retry: 3000\n\n');
 
-      noblejs.statusEmitter.on('reset', () => {
-        console.log('Got /reset');
-        res.write('data: reset\n\n');
+      noblejs.statusEmitter.on('disconnected', () => {
+        console.log('Got /disconnected');
+        res.write('data: disconnected\n\n');
       });
 
       noblejs.statusEmitter.on('connecting', () => {

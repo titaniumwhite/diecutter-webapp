@@ -5,12 +5,12 @@ body {
 
 .button-box {
     text-align: center;
-    margin-top: 130px;
+    margin-top: 180px;
 }
 
 .btn-lg {
-    width: 1000px !important;
-    height: 400px !important;
+    width: 800px !important;
+    height: 300px !important;
     font-size: xx-large;
 }
 
