@@ -26,6 +26,12 @@ if (!!window.EventSource) {
                 $('#infobar').css('background-color', 'forestgreen');
                 $('#infobar').css('color', 'white');
             }
+            
+            if (e.data == 'error-no_usb') {
+                $('#infobar').text("ERRORE: collegare l'adattatore USB e ricaricare la pagina");
+                $('#infobar').css('background-color', 'red');
+                $('#infobar').css('color', 'white');
+            }
         }
     }, false);
   
