@@ -40,16 +40,18 @@ function on_discovery(peripheral) {
       
   if (encoded_data[0] == 0x99 && encoded_data[1] == 0x04 && encoded_data[2] == 5) {
     
+    // if no packets for 60 seconds, device is disconnected
     clearTimeout(idTimeout);
-    idTimeout = setTimeout(reset, 30000);
+    idTimeout = setTimeout(reset, 60000);
 
     // first ruuvi packet received
     if (first_data) {
       idInterval = setInterval(checkList, 15000);
-      statusEmitter.emit('connected');
       first_data = false;
     }
 
+    statusEmitter.emit('connected', peripheral.address);
+    
     let data_slice = encoded_data.slice(2);
 
     decoded_data = decode_data(data_slice);

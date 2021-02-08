@@ -14,30 +14,28 @@ if (!!window.EventSource) {
         let status;
         if (this.readyState == eventSource.OPEN) {
             console.log(e.data);
-            if (e.data == 'connecting') {
-                status = 'connecting';
-                $('#infobar').text('Connessione in corso...' );
-            }
 
-            if (e.data == 'disconnected') {
-                status = 'disconnected';
-                $('#infobar').text('Disconnesso dal dispositivo');
-                $('#infobar').css('background-color', 'firebrick');
-                $('#infobar').css('color', 'white');
-            }
-
-            if (e.data == 'connected') {
-                status = 'connected';
-                $('#infobar').text('Connessione effettuata');
-                $('#infobar').css('background-color', 'forestgreen');
-                $('#infobar').css('color', 'white');
-            }
-            
             if (e.data == 'error-no_usb') {
                 status = 'offline';
                 $('#infobar').text("ERRORE: collegare l'adattatore USB e ricaricare la pagina");
                 $('#infobar').css('background-color', 'red');
                 $('#infobar').css('color', 'white');
+            } else if (e.data == 'connecting') {
+                status = 'connecting';
+                $('#infobar').text('Connessione in corso...' );
+            } else if (e.data == 'disconnected') {
+                status = 'disconnected';
+                $('#infobar').text('Disconnesso dal dispositivo');
+                $('#infobar').css('background-color', 'firebrick');
+                $('#infobar').css('color', 'white');
+            } else {
+                let parsed_data = JSON.parse(e.data);
+                if (parsed_data['event'] == 'connected') {
+                    status = 'connected';
+                    $('#infobar').text('Connessione effettuata a ' + parsed_data['mac']);
+                    $('#infobar').css('background-color', 'forestgreen');
+                    $('#infobar').css('color', 'white');
+                }
             }
 
             sessionStorage.setItem('status', JSON.stringify(status));

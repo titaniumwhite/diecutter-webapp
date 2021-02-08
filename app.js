@@ -35,7 +35,6 @@ if (cluster.isMaster) {
 
   function eventSource_handler() {
     app.get('/status', function(req, res) {
-      console.log('Got /offline');
       res.set({
         'Cache-Control': 'no-cache',
         'Content-Type': 'text/event-stream',
@@ -56,9 +55,9 @@ if (cluster.isMaster) {
         res.write('data: connecting\n\n');
       });
 
-      noblejs.statusEmitter.on('connected', () => {
-        console.log('Got /connected');
-        res.write('data: connected\n\n');
+      noblejs.statusEmitter.on('connected', (address) => {
+        console.log('Got /connected to ' + address);
+        res.write('data: ' + JSON.stringify({'event' : 'connected', 'mac' : address}) + '\n\n');
       });
 
       statusEmitterApp.on('error-no_usb', () => {
