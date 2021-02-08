@@ -1,12 +1,14 @@
 if (!!window.EventSource) {
     let eventSource = new EventSource("/status");
 
-    eventSource.addEventListener('open', function(e) {
-        if (this.readyState == eventSource.OPEN) {
-            console.log('Offline');
-            $('#infobar').text('Offline');
-        }
-    }, false);
+    if (JSON.parse(sessionStorage.getItem('status')) == null) {
+        eventSource.addEventListener('open', function(e) {
+            if (this.readyState == eventSource.OPEN) {
+                console.log('open Offline');
+                $('#infobar').text('Offline');
+            }
+        }, false);
+    }
 
     eventSource.addEventListener('message', function(e) {
         let status;
@@ -53,7 +55,7 @@ if (!!window.EventSource) {
 
 function reload() {
     let status = JSON.parse(sessionStorage.getItem('status'));
-    console.log(status);
+    console.log("Lo status è " + status);
     if (status == 'offline') {
         console.log('Offline');
         $('#infobar').css('background-color', 'rgb(230, 228, 228)');

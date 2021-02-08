@@ -12,14 +12,14 @@ let first_scan = true;
 let first_data = true;
 
 function explore() {
-  noble.on('stateChange', async function (state) {
-    if (state === 'poweredOn') {
-      await noble.startScanningAsync([], true);
-    }
-  });
-
   // avoid to overcall 
   if (first_scan) {
+    noble.on('stateChange', async function (state) {
+      if (state === 'poweredOn') {
+        await noble.startScanningAsync([], true);
+      }
+    });
+  
     noble.on('scanStart', function() {
       console.log("Scanning started.");
       statusEmitter.emit('connecting');
