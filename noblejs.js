@@ -8,7 +8,8 @@ let actual_mac = {};
 let temporary_mac = [];
 let idInterval; // after 15 seconds, delete the unnecessary objects in the dectionary and initialize the list
 let idTimeout; // if there are no packets for 30 seconds, the connection is lost
-let first = true;
+let first_scan = true;
+let first_data = true;
 
 function explore() {
   noble.on('stateChange', async function (state) {
@@ -18,13 +19,15 @@ function explore() {
   });
 
   // avoid to overcall 
-  if (first) {
+  if (first_scan) {
     noble.on('scanStart', function() {
       console.log("Scanning started.");
       statusEmitter.emit('connecting');
     });
 
     noble.on('discover', on_discovery);
+
+    first_scan = false;
   }
 }
 
@@ -41,10 +44,10 @@ function on_discovery(peripheral) {
     idTimeout = setTimeout(reset, 30000);
 
     // first ruuvi packet received
-    if (first) {
+    if (first_data) {
       idInterval = setInterval(checkList, 15000);
       statusEmitter.emit('connected');
-      first = false;
+      first_data = false;
     }
 
     let data_slice = encoded_data.slice(2);
@@ -103,7 +106,8 @@ async function reset() {
   console.log("Scanning stopped.");
   clearInterval(idInterval);
   clearInterval(idTimeout);
-  first = true;
+  first_data = true;
+  first_scan = true;
 }
 
 function updateList(array, value) {
