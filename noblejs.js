@@ -57,19 +57,18 @@ function on_discovery(peripheral) {
     decoded_data = decode_data(data_slice);
     decoded_data["mac"] = peripheral.address;
 
-    console.log(peripheral.address + '  RSSI -> ' + peripheral.rssi);
-    //console.log(decoded_data);
+    console.log('Packet from ' + peripheral.address + ' RSSI -> ' + peripheral.rssi);
 
     updateList(temporary_mac, peripheral.address);
 
     // write in the database only the packet of the closer device
     if (peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi)) {
-      console.log("Writing the data of " + peripheral.address);
+      console.log("Writing on Influx the data of " + peripheral.address);
       influx.write(decoded_data);
     }
 
-    console.log(actual_mac);
-    console.log(temporary_mac);
+    /*console.log(actual_mac);
+    console.log(temporary_mac);*/
     console.log();
     console.log();
   }
@@ -105,7 +104,7 @@ function decode_data(data) {
 
 async function reset() {
   statusEmitter.emit('disconnected');
-  console.log("Scanning stopped.");
+  console.log("Disconnected from RuuviTag.");
   clearInterval(idInterval);
   clearInterval(idTimeout);
   first_data = true;
@@ -125,7 +124,7 @@ function updateList(array, value) {
 function checkList() {
   if (Object.keys(actual_mac).length > temporary_mac.length) {
     for (let key in actual_mac) {
-      console.log("iterating " + key)
+      //console.log("iterating " + key)
       if (temporary_mac.indexOf(key) === -1) delete actual_mac[`${key}`];
     }
   }

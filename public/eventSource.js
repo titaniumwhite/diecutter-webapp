@@ -4,8 +4,7 @@ if (!!window.EventSource) {
     if (JSON.parse(sessionStorage.getItem('status')) == null) {
         eventSource.addEventListener('open', function(e) {
             if (this.readyState == eventSource.OPEN) {
-                console.log('open Offline');
-                $('#infobar').text('Offline');
+                $('#infobar').text('Connessione in corso...' );
             }
         }, false);
     }
@@ -16,7 +15,7 @@ if (!!window.EventSource) {
             console.log(e.data);
 
             if (e.data == 'error-no_usb') {
-                status = 'offline';
+                status = 'connecting';
                 $('#infobar').text("ERRORE: collegare l'adattatore USB e ricaricare la pagina");
                 $('#infobar').css('background-color', 'red');
                 $('#infobar').css('color', 'white');
@@ -54,13 +53,9 @@ if (!!window.EventSource) {
 function reload() {
     let status = JSON.parse(sessionStorage.getItem('status'));
     console.log("Lo status è " + status);
-    if (status == 'offline') {
-        console.log('Offline');
-        $('#infobar').css('background-color', 'rgb(230, 228, 228)');
-        $('#infobar').text('Offline');
-    }
 
     if (status == 'connecting') {
+        $('#infobar').css('background-color', 'rgb(230, 228, 228)');
         $('#infobar').text('Connessione in corso...' );
     }
 
