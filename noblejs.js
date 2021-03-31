@@ -96,7 +96,7 @@ function decode_data(data) {
   }
 
   measurement["movement_counter"] = data.slice(15,16).readUInt8();
-  measurement["sequence_number"] = data.slice(16,18).readInt16BE();
+  measurement["sequence_number"] = data.slice(16,18).readUInt16BE();
   measurement["rounds"] = data.slice(18,24).readUIntBE(0,6);
 
   return measurement;
