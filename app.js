@@ -16,7 +16,6 @@ app.get('/', (req, res) => {
 });
 
 noblejs.explore();
-  
 
 function eventSource_handler() {
   app.get('/status', function(req, res) {
@@ -27,26 +26,21 @@ function eventSource_handler() {
     });
     res.flushHeaders();
 
-      // tell the client to retry every 3 seconds if connectivity is lost
     res.write('retry: 3000\n\n');
 
     noblejs.statusEmitter.on('disconnected', () => {
-      //console.log('Got /disconnected');
       res.write('data: disconnected\n\n');
     });
 
     noblejs.statusEmitter.on('connecting', () => {
-      //console.log('Got /connecting');
       res.write('data: connecting\n\n');
     });
 
     noblejs.statusEmitter.on('connected', (address) => {
-      //console.log('Got /connected to ' + address);
       res.write('data: ' + JSON.stringify({'event' : 'connected', 'mac' : address}) + '\n\n');
     });
 
     statusEmitterApp.on('error-no_usb', () => {
-      //console.log('Got /error-no_usb');
       res.write('data: error-no_usb\n\n');
     });
   });
@@ -55,14 +49,14 @@ function eventSource_handler() {
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception ', err.message);
   if (err.message == 'LIBUSB_TRANSFER_STALL' || err.message == 'No compatible USB Bluetooth 4.0 device found!') {
-    console.error("ERRORE: l'adattatore usb bluetooth è stato rimosso. Riconnetterlo e riavviare manualmente l'applicazione.");
+    //console.error("ERRORE: l'adattatore usb bluetooth è stato rimosso. Riconnetterlo e riavviare manualmente l'applicazione.");
     statusEmitterApp.emit('error-no_usb');
   }
 
-    // exit the process after having shown the error message
-  setTimeout(() => {process.exit(1);}, 5); 
+  // exit the process after having shown the error message
+  process.exit(1);
 })
 
-  server.listen(port, () => {
-    console.log(`Listening at http://localhost:${port}`);
-  });
+server.listen(port, () => {
+  console.log(`Listening at http://localhost:${port}`);
+});

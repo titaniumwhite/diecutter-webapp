@@ -1,0 +1,10 @@
+{
+    "uid": "app",
+    "append": true,
+    "watch": true,
+    "script": "app.js",
+    "sourceDir": "C:/Users/gabri/Desktop/Rotalaser/diecutter-webapp",
+    "logFile": "C:/Users/gabri/Desktop/Rotalaser/log/forever.log",
+    "outFile": "C:/Users/gabri/Desktop/Rotalaser/log/out.log",
+    "errFile": "C:/Users/gabri/Desktop/Rotalaser/log/error.log"
+}

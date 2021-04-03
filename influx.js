@@ -1,5 +1,4 @@
 const Influx = require('influx');
-//const os = require('os');
 
 const influx = new Influx.InfluxDB({
     host: 'localhost',
@@ -26,7 +25,6 @@ function write(data) {
     influx.writePoints([
         {
             measurement: 'ruuvi',
-            //tags: { host: os.hostname() },
             fields: { 
                 mac: data['mac'],
                 acceleration_x: data['acceleration_x'],
