@@ -59,11 +59,11 @@ function on_discovery(peripheral) {
 
     // write in the database only the packet of the closer device
     if ((peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi))
-          && last_round_value !== decode_data["rounds"]) {
+          && last_round_value !== decoded_data["rounds"]) {
       //console.log("Writing on Influx the data of " + peripheral.address);
       influx.write(decoded_data);
     }
-    last_round_value = decode_data["rounds"];
+    last_round_value = decoded_data["rounds"];
   }
 }
 
