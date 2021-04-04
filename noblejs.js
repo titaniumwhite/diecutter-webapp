@@ -10,6 +10,7 @@ let idInterval; // after 15 seconds, delete the unnecessary objects in the decti
 let idTimeout; // if there are no packets for 45 seconds, the connection is considered as lost
 let first_scan = true;
 let first_data = true;
+let last_round_value = -1;
 
 function explore() {
   noble.on('stateChange', async function (state) {
@@ -57,11 +58,12 @@ function on_discovery(peripheral) {
     updateList(temporary_mac, peripheral.address);
 
     // write in the database only the packet of the closer device
-    if (peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi)) {
+    if ((peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi))
+          && last_round_value !== decode_data["rounds"]) {
       //console.log("Writing on Influx the data of " + peripheral.address);
       influx.write(decoded_data);
     }
-
+    last_round_value = decode_data["rounds"];
   }
 }
 
