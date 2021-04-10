@@ -25,3 +25,11 @@ Per visualizzare sulla Windows PowerShell i console.log in real-time, si può us
 * node-influx è compatibile solo con InfluxDB 1.x.x. L'ultima versione di InfluxDB disponibile per Windows è 1.8.4.
 * Noble.js su Windows richiede necessariamente un [dongle usb compatibile.](https://github.com/abandonware/node-bluetooth-hci-socket#windows) Maggiori informazioni sull'installazione si trovano nel Readme di Noble.js.
 * E' presente l'API [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource). EventSource non è compatibile con Internet Explorer.
+
+# Script all'avvio
+Per fare in modo che l'applicazione parta in automatico all'avvio del pc, premere WINDOWS+R, digitare
+
+```
+shell:startup
+```
+e incollare [startup_script.bat](./startup_script.bat) avendo cura di specificare i corretti path per il dispositivo corrente.
