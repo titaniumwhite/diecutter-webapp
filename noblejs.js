@@ -13,6 +13,8 @@ let first_data = true;
 let last_round_value = -1;
 let session = influx.readSession();
 
+influx.getLastRound(setRounds);
+
 function explore() {
   noble.on('stateChange', async function (state) {
     if (state === 'poweredOn') {
@@ -138,6 +140,11 @@ function updateDictionary(dict, mac, rssi) {
   else dict[`${mac}`] = rssi;
 
   return Object.keys(dict).reduce((a, b) => dict[a] > dict[b] ? a : b);
+}
+
+function setRounds(round){
+  last_round_value=round;
+  console.log("last_round "+last_round_value);
 }
 
 module.exports = {

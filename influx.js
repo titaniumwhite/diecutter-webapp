@@ -47,7 +47,22 @@ function readSession() {
   else return 1;
 }
 
+function getLastRound(callback) {
+
+  influx.query('select last(rounds) from ruuvi order by desc limit 1').catch(err=>{
+      console.log(err);
+    })
+    .then(results=>{
+      if(results.length > 0)
+        callback(results[0].last);
+      else
+        callback(-1);
+
+    });
+}
+
 module.exports = {
   write,
-  readSession
+  readSession,
+  getLastRound
 }
