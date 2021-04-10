@@ -5,6 +5,8 @@
     "main": "app.js",
     "private": true,
     "dependencies": {
+        "@abandonware/bluetooth-hci-socket": "*",
+        "@abandonware/noble": "*",
         "cluster": "^0.7.7",
         "express": "^4.0.0",
         "influx": "^5.7.0",
