@@ -1,6 +1,7 @@
 @ECHO OFF
 echo Launching app...
 ::tbd !!! MISSING INFLUX PATH && MISSING FOREVER.JSON absolute path!!!
+::start /B start .\influxd.exe
 start /B forever start .\forever.json
 timeout /t 1
 echo Launching browser...
