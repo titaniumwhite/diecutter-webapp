@@ -4,4 +4,4 @@ node_modules
 .vs
 .vscode
 log/
-forever.json
+*.json
