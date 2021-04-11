@@ -13,7 +13,7 @@ const influx = new Influx.InfluxDB({
           acceleration_z: Influx.FieldType.FLOAT,
           sequence_number: Influx.FieldType.INTEGER,
           rounds: Influx.FieldType.INTEGER,
-          session: Influx.FieldType.INTEGER
+          session_id: Influx.FieldType.INTEGER
         },
         tags: [
           'host'
@@ -33,7 +33,7 @@ function write(data) {
               acceleration_z: data['acceleration_z'],
               sequence_number: data['sequence_number'],
               rounds: data['rounds'],
-              session: data['session']
+              session_id: data['session_id']
             }
         }
     ], {
@@ -41,14 +41,19 @@ function write(data) {
     });
 }
 
-function readSession() {
-  let query = influx.query('select * from ruuvi order by desc limit 1');
-  if (query.hasOwnProperty('session')) return (query[0])['session'];
-  else return 1;
+function getLastSession(callback) {
+  influx.query('select last(session_id) from ruuvi order by desc limit 1').catch(err=>{
+      console.log(err);
+    })
+    .then(results=>{
+      if(results.length > 0)
+        callback(results[0].last);
+      else
+        callback(0);
+    });
 }
 
 function getLastRound(callback) {
-
   influx.query('select last(rounds) from ruuvi order by desc limit 1').catch(err=>{
       console.log(err);
     })
@@ -57,12 +62,11 @@ function getLastRound(callback) {
         callback(results[0].last);
       else
         callback(-1);
-
     });
 }
 
 module.exports = {
   write,
-  readSession,
+  getLastSession,
   getLastRound
 }

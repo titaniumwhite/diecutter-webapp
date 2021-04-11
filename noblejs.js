@@ -1,7 +1,6 @@
 const noble = require('@abandonware/noble');
 const influx = require('./influx');
 const { EventEmitter } = require('events');
-const { get } = require('jquery');
 
 const statusEmitter = new EventEmitter();
 
@@ -10,10 +9,13 @@ let temporary_mac = [];
 let idInterval; // after 15 seconds, delete the unnecessary objects in the dectionary and initialize the list
 let idTimeout; // if there are no packets for 45 seconds, the connection is considered as lost
 let first_data = true;
+let session_on = false;
+let session_id = 0;
 let last_round_value = -1;
-let session = influx.readSession();
+let last_movement_counter = 0;
 
 influx.getLastRound(setRounds);
+influx.getLastSession(setSession);
 
 function explore() {
   noble.on('stateChange', async function (state) {
@@ -38,7 +40,6 @@ function on_discovery(peripheral) {
   let encoded_data = peripheral.advertisement.manufacturerData;
 
   if (encoded_data[0] == 0x99 && encoded_data[1] == 0x04 && encoded_data[2] == 5) {
-    
     // if no packets for 45 seconds, device is disconnected
     clearTimeout(idTimeout);
     idTimeout = setTimeout(reset, 45000);
@@ -58,19 +59,28 @@ function on_discovery(peripheral) {
     decoded_data = decode(data_slice);
     decoded_data["mac"] = peripheral.address;
 
-    //console.log('Packet from ' + peripheral.address + ' RSSI -> ' + peripheral.rssi);
+    //console.log('Packet from ' + peripheral.address + ' movement counter -> ' + decoded_data["movement_counter"]);
+
+    if ( (decoded_data["movement_counter"] > 0 && session_on == false) 
+      || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
+      session_id++;
+      session_on = true;
+    } else if (decoded_data["movement_counter"] == 0 && session_on == true) {
+      session_on = false;
+    }
 
     // write in the database only the packet of the closer device
     if ((peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi))
-          && last_round_value !== decoded_data["rounds"]) {
+          && last_round_value !== decoded_data["rounds"]
+          && session_on == true) {
       
       //console.log("Writing on Influx the data of " + peripheral.address);
-
-      if (decoded_data["rounds"] == 0) session++;
-      decoded_data["session"] = session;
+      decoded_data["session_id"] = session_id;
       influx.write(decoded_data);
     }
+
     last_round_value = decoded_data["rounds"];
+    last_movement_counter = decoded_data["movement_counter"];
   }
 }
 
@@ -142,9 +152,14 @@ function updateDictionary(dict, mac, rssi) {
   return Object.keys(dict).reduce((a, b) => dict[a] > dict[b] ? a : b);
 }
 
-function setRounds(round){
-  last_round_value=round;
-  console.log("last_round "+last_round_value);
+function setRounds(result){
+  last_round_value = result;
+  //console.log("last_round " + last_round_value);
+}
+
+function setSession(result){
+  session_id = result;
+  //console.log("session_id " + session_id);
 }
 
 module.exports = {
