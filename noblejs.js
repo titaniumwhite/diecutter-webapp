@@ -42,7 +42,7 @@ function on_discovery(peripheral) {
   if (encoded_data[0] == 0x99 && encoded_data[1] == 0x04 && encoded_data[2] == 5) {
     // if no packets for 45 seconds, device is disconnected
     clearTimeout(idTimeout);
-    idTimeout = setTimeout(reset, 45000);
+    idTimeout = setTimeout(reset, 90000);
 
     // first ruuvi packet received
     if (first_data) {
@@ -60,19 +60,20 @@ function on_discovery(peripheral) {
     decoded_data["mac"] = peripheral.address;
 
     //console.log('Packet from ' + peripheral.address + ' movement counter -> ' + decoded_data["movement_counter"]);
-
+	/*
     if ( (decoded_data["movement_counter"] > 0 && session_on == false) 
       || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
       session_id++;
       session_on = true;
     } else if (decoded_data["movement_counter"] == 0 && session_on == true) {
       session_on = false;
-    }
+    }*/
 
     // write in the database only the packet of the closer device
     if ((peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi))
           && last_round_value !== decoded_data["rounds"]
-          && session_on == true) {
+          /*&& session_on == true*/
+		  ) {
       
       //console.log("Writing on Influx the data of " + peripheral.address);
       decoded_data["session_id"] = session_id;

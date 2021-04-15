@@ -6,6 +6,7 @@ const path    = require('path');
 const server  = require('http').createServer(app); 
 const port    = 8000;
 const noblejs = require('./noblejs');
+require('log-timestamp');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
