@@ -15,11 +15,11 @@ Il comando per avviare l'applicazione tramite Nodemon è
 npm start
 ```
 
-## Forever (produzione)
-Forever viene utilizzato per mantenere un server attivo, anche quando crasha o si stoppa inaspettatamente. Forever trasforma il server in un processo demone, trasformandolo a tutti gli effetti in un servizio. E' stata creata una cartella dove verranno mantenuti tutti i log.
-Per avviare l'applicazione tramite Forever viene usato ```forever start forever.json```.
-Per fermare tutti i processi creati da Forever viene usato ```forever stopall```.
-Per visualizzare sulla Windows PowerShell i console.log in real-time, si può usare ```Get-Content /path/to/logfile.log -Wait -Tail 1000```.
+## Pm2 (produzione)
+Per avviare il processo tramite pm2 viene usato ```pm2 start ecosystem.config.js```.
+Per fermare il processo tramite pm2 viene usato ```pm2 stop ecosystem.config.js```.
+Possibile anche usare _delete_ per rimuovere un processo o _restart_ per farlo avviare nuovamente.
+Infine, in una nuova PowerShell, tramite il comando ```pm2 monit``` si avrà un chiaro grafico di ciò che sta accadendo (consigliato usarlo).
 
 # Compatibilità
 * node-influx è compatibile solo con InfluxDB 1.x.x. L'ultima versione di InfluxDB disponibile per Windows è 1.8.4.
