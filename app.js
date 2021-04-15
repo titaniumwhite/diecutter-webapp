@@ -6,7 +6,7 @@ const path    = require('path');
 const server  = require('http').createServer(app); 
 const port    = 8000;
 const noblejs = require('./noblejs');
-require('log-timestamp');
+//require('log-timestamp');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -41,8 +41,12 @@ function eventSource_handler() {
       res.write('data: ' + JSON.stringify({'event' : 'connected', 'mac' : address}) + '\n\n');
     });
 
-    statusEmitterApp.on('error-no_usb', () => {
-      res.write('data: error-no_usb\n\n');
+    noblejs.statusEmitter.on('error_adapter_stuck', () => {
+      res.write('data: error_adapter_stuck\n\n');
+    });
+
+    statusEmitterApp.on('error_no_usb', () => {
+      res.write('data: error_no_usb\n\n');
     });
   });
 }
@@ -51,7 +55,7 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught exception ', err.message);
   if (err.message == 'LIBUSB_TRANSFER_STALL' || err.message == 'No compatible USB Bluetooth 4.0 device found!') {
     //console.error("ERRORE: l'adattatore usb bluetooth è stato rimosso. Riconnetterlo e riavviare manualmente l'applicazione.");
-    statusEmitterApp.emit('error-no_usb');
+    statusEmitterApp.emit('error_no_usb');
   }
 
   // exit the process after having shown the error message

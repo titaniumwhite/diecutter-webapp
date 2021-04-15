@@ -14,9 +14,14 @@ if (!!window.EventSource) {
         if (this.readyState == eventSource.OPEN) {
             console.log(e.data);
 
-            if (e.data == 'error-no_usb') {
+            if (e.data == 'error_no_usb') {
                 status = 'connecting';
                 $('#infobar').text("ERRORE: collegare l'adattatore USB e ricaricare la pagina");
+                $('#infobar').css('background-color', 'red');
+                $('#infobar').css('color', 'white');
+            } else if (e.data == 'error_adapter_stuck') {
+                status = 'error_adapter_stuck';
+                $('#infobar').text("ERRORE: l'adattatore usb non riceve più pacchetti bluetooth. Tentativo di riconnessione in corso...");
                 $('#infobar').css('background-color', 'red');
                 $('#infobar').css('color', 'white');
             } else if (e.data == 'connecting') {
@@ -24,8 +29,8 @@ if (!!window.EventSource) {
                 $('#infobar').text('Connessione in corso...' );
             } else if (e.data == 'disconnected') {
                 status = 'disconnected';
-                $('#infobar').text('Disconnesso dal dispositivo');
-                $('#infobar').css('background-color', 'firebrick');
+                $('#infobar').text('Non ci sono RuuviTag nelle vicinanze');
+                $('#infobar').css('background-color', 'red');
                 $('#infobar').css('color', 'white');
             } else {
                 let parsed_data = JSON.parse(e.data);
@@ -60,8 +65,8 @@ function reload() {
     }
 
     if (status == 'disconnected') {
-        $('#infobar').text('Disconnesso dal dispositivo');
-        $('#infobar').css('background-color', 'firebrick');
+        $('#infobar').text('Non ci sono RuuviTag nelle vicinanze');
+        $('#infobar').css('background-color', 'red');
         $('#infobar').css('color', 'white');
     }
 
@@ -71,8 +76,14 @@ function reload() {
         $('#infobar').css('color', 'white');
     }
     
-    if (status == 'error-no_usb') {
+    if (status == 'error_no_usb') {
         $('#infobar').text("ERRORE: collegare l'adattatore USB e ricaricare la pagina");
+        $('#infobar').css('background-color', 'red');
+        $('#infobar').css('color', 'white');
+    }
+
+    if (e.data == 'error_adapter_stuck') {
+        $('#infobar').text("ERRORE: l'adattatore usb non riceve più pacchetti bluetooth. Tentativo di riconnessione in corso...");
         $('#infobar').css('background-color', 'red');
         $('#infobar').css('color', 'white');
     }
