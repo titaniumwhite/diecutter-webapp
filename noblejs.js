@@ -32,6 +32,15 @@ function explore() {
   noble.on('discover', on_discovery);
 }
 
+function is_ruuvi_packet(ble_raw_data) {
+	is_ruuvi_packet = Boolean(ble_raw_data.length == 26 && 
+					  		  ble_raw_data[0] == 0x99 && 
+					  		  ble_raw_data[1] == 0x04 && 
+					  		  ble_raw_data[2] == 5);
+
+	return is_ruuvi_packet;
+}
+
 function on_discovery(peripheral) {
   // ignore devices with no manufacturer data
   if (!peripheral.advertisement.manufacturerData || peripheral.advertisement.manufacturerData[0] != 0x99) 
@@ -39,7 +48,7 @@ function on_discovery(peripheral) {
   
   let encoded_data = peripheral.advertisement.manufacturerData;
 
-  if (encoded_data[0] == 0x99 && encoded_data[1] == 0x04 && encoded_data[2] == 5) {
+  if (is_ruuvi_packet(encoded_data)) {
     // if no packets for 45 seconds, device is disconnected
     clearTimeout(idTimeout);
     idTimeout = setTimeout(reset, 90000);
