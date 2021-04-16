@@ -54,7 +54,7 @@ function on_discovery(peripheral) {
   clearTimeout(idGlobal);
   idGlobal = setInterval(recover_adapter, 240000);
 
-  if (!is_ruuvi_packet(peripheral.advertisement.manufacturerData)) 
+  if (!peripheral.advertisement.manufacturerData || !is_ruuvi_packet(peripheral.advertisement.manufacturerData)) 
     return;
   
   statusEmitter.emit('connected', peripheral.address);
