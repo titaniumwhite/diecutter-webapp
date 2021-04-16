@@ -41,10 +41,11 @@ function explore() {
 }
 
 function is_ruuvi_packet(ble_raw_data) {
-	let is_ruuvi_packet = Boolean(ble_raw_data.length == 26 && 
-					  		  ble_raw_data[0] == 0x99 && 
-					  		  ble_raw_data[1] == 0x04 && 
-					  		  ble_raw_data[2] == 5);
+	let is_ruuvi_packet = Boolean(ble_raw_data && 
+								  ble_raw_data.length == 26 && 
+						  		  ble_raw_data[0] == 0x99 && 
+						  		  ble_raw_data[1] == 0x04 && 
+						  		  ble_raw_data[2] == 5);
 
 	return is_ruuvi_packet;
 }
@@ -54,12 +55,13 @@ function on_discovery(peripheral) {
   clearTimeout(idGlobal);
   idGlobal = setInterval(recover_adapter, 240000);
 
-  if (!is_ruuvi_packet(peripheral.advertisement.manufacturerData)) 
+  let encoded_data = peripheral.advertisement.manufacturerData;
+
+  if (!is_ruuvi_packet(encoded_data)) 
     return;
   
   statusEmitter.emit('connected', peripheral.address);
-  let encoded_data = peripheral.advertisement.manufacturerData;
-
+  
   // if no ruuvi packets for 120 seconds, there isn't any ruuvi around
   clearTimeout(idRuuvi);
   idRuuvi = setTimeout(no_ruuvi_around, 120000);
