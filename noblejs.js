@@ -1,5 +1,12 @@
+/*
+* TODO : quando ci sono due RuuviTag, invia alternativamente il pacchetto socket. Gestire il caso, facendo in modo
+*        che invii il pacchetto solo del Ruuvi più vicino attivo.
+* TODO : pulire il codice, eliminare le variabili globali.
+*/
+
 const noble = require('@abandonware/noble');
 const influx = require('./influx');
+const RuuviTag = require('./ruuvitag');
 const { EventEmitter } = require('events');
 const net = require('net');
 const KalmanFilter = require('kalmanjs');
@@ -7,14 +14,15 @@ const KalmanFilter = require('kalmanjs');
 const statusEmitter = new EventEmitter();
 const client = new net.Socket();
 
-let actual_mac = {};
-let temporary_mac = [];
-let idInterval; // after 15 seconds, delete the unnecessary objects in the dectionary and initialize the list
-let idRuuvi; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
-let idGlobal; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
-let first_data = true; // boolean to check whether it is the first packet received 
-let session_on = false; // boolean to check whether we are currently in a session, according to the movement_counter
-let session_id = 0;
+// Kalman Settings
+const R = 0.01;
+const Q = 3;
+
+let temporary_list = [];
+let update_ruuvi_list_timeout; // after 15 seconds, delete the unnecessary objects in the dectionary and initialize the list
+let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
+let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
+let first_ruuvi_packet = true; // boolean to check whether it is the first packet received 
 let last_round_value = -1;
 let last_movement_counter = 0;
 let socket_already_sent = false;
@@ -29,204 +37,252 @@ client.connect(2345, '127.0.0.1', function() {
 influx.getLastRound(setRounds);
 influx.getLastSession(setSession);
 
-function explore() {
-  noble.on('stateChange', async function (state) {
-    if (state === 'poweredOn') {
-      await noble.startScanningAsync([], true);
-    }
-  });
-  
-  noble.on('scanStart', function() {
-    console.log("Scanning started.");
-    statusEmitter.emit('connecting');
-  });
+function start_exploring() {
+  let ruuvi_list = [];
+  explore();
 
-  noble.on('scanStop', function() {
-    console.log("Scanning stopped.");
-    setTimeout(() => {
-      noble.startScanningAsync();
-    }, 60000)
-  });
+  function explore() {
+    noble.on('stateChange', async function (state) {
+      if (state === 'poweredOn') {
+        await noble.startScanningAsync([], true);
+      }
+    });
+    
+    noble.on('scanStart', function() {
+      console.log("Scanning started.");
+      statusEmitter.emit('connecting');
+    });
 
-  noble.on('discover', on_discovery);
-}
+    noble.on('scanStop', function() {
+      console.log("Scanning stopped.");
+      setTimeout(() => {
+        noble.startScanningAsync();
+      }, 60000)
+    });
 
-function on_discovery(peripheral) {
-  
-  clearTimeout(idGlobal);
-  idGlobal = setInterval(recover_adapter, 240000);
-
-  let encoded_data = peripheral.advertisement.manufacturerData;
-
-  if (!encoded_data || !is_ruuvi_packet(encoded_data)) 
-    return;
-  
-  statusEmitter.emit('connected', peripheral.address);
-  
-  // if no ruuvi packets for 120 seconds, there isn't any ruuvi around
-  clearTimeout(idRuuvi);
-  idRuuvi = setTimeout(no_ruuvi_around, 120000);
-
-  // first ruuvi packet received
-  if (first_data) {
-    idInterval = setInterval(checkList, 15000);
-    first_data = false;
+    noble.on('discover', on_discovery);
   }
+
+  function on_discovery(peripheral) {
+
+    clearTimeout(adapter_stuck_timeout);
+    adapter_stuck_timeout = setInterval(recover_adapter, 300000);
+
+    let encoded_data = peripheral.advertisement.manufacturerData;
+
+    if (!encoded_data || !is_ruuvi_packet(encoded_data)) 
+      return;
+    
+    let ruuvi;
+    let mac = peripheral.address;
+    let rssi = peripheral.rssi;
+    decoded_data = decode(encoded_data.slice(2), mac);
+
+    statusEmitter.emit('connected', mac);
+    
+    // if no ruuvi packets for 120 seconds, there isn't any ruuvi around
+    clearTimeout(no_ruuvi_timeout);
+    no_ruuvi_timeout = setTimeout(no_ruuvi_around, 120000);
+
+    // first ruuvi packet received
+    if (first_ruuvi_packet) {
+      update_ruuvi_list_timeout = setInterval(() => { update_ruuvi_list(ruuvi_list) }, 120000);
+      first_ruuvi_packet = false;
+    }
+          
+    update_temporary_list(temporary_list, mac);
+
+    let ruuvi_index_list = is_mac_in_ruuvi_list(ruuvi_list, mac);
+    if (ruuvi_index_list != -1)
+      ruuvi = update_rssi(ruuvi_list, ruuvi_index_list, rssi);
+    else 
+      ruuvi = create_ruuvi(ruuvi_list, mac, rssi);
+
+    console.log('Packet from ' + peripheral.address + ' movement counter -> ' + decoded_data["movement_counter"]);
+
+    let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
+
+    if ( (decoded_data["movement_counter"] > 0 && ruuvi.in_session == false) 
+      || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
+      ruuvi.increase_session_id;
+      ruuvi.in_session = true;
+      if (socket_current_mac != ruuvi.mac) {
+        socket_current_mac = ruuvi.mac;
+        socket_already_sent = false;
+      }
+    } else if (decoded_data["movement_counter"] == 0 && ruuvi.in_session == true) {
+      ruuvi.in_session = false;
+    }
+
+    if (ruuvi.in_session == true && socket_already_sent == false) {
+      socket_already_sent = true;
+      socket_current_mac = ruuvi.mac;
+      send_to_socket(socket_current_mac, ruuvi.session_id);
+    }
+
+    // write in the database only the packet of the closer device
+    if (ruuvi === closer_ruuvi && 
+        last_round_value !== decoded_data["rounds"] && 
+        ruuvi.in_session === true
+      ) {
         
-  updateList(temporary_mac, peripheral.address);
-   
-  let data_slice = encoded_data.slice(2);
-
-  decoded_data = decode(data_slice);
-  decoded_data["mac"] = peripheral.address;
-
-  console.log('Packet from ' + peripheral.address + ' movement counter -> ' + decoded_data["movement_counter"]);
-
-  if ( (decoded_data["movement_counter"] > 0 && session_on == false) 
-    || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
-    session_id++;
-    session_on = true;
-    if (socket_current_mac != decoded_data["mac"]) {
-      socket_current_mac = decoded_data["mac"];
-      socket_already_sent = false;
+      //console.log("Writing on Influx the data of " + peripheral.address);
+      decoded_data["session_id"] = ruuvi.session_id;
+      influx.write(decoded_data);
     }
-  } else if (decoded_data["movement_counter"] == 0 && session_on == true) {
-    session_on = false;
+
+    last_round_value = decoded_data["rounds"];
+    last_movement_counter = decoded_data["movement_counter"];
+
   }
 
-  if (session_on == true && socket_already_sent == false) {
-    socket_already_sent = true;
-    socket_current_mac = decoded_data["mac"];
-    send_to_socket(socket_current_mac, session_id);
-  }
-
-  /*
-  * TBD: gestire il caso in cui il RuuviTag più lontano inizia la sessione e rimane in sessione
-  *      e successivamente il RuuviTag più vicino inizia la sessione. In tal caso, 
-  *      verrebbero scritti i pacchetti del RuuviTag più lontano fin quando rimane in sessione.
-  */
-
-  // write in the database only the packet of the closer device
-  if ((peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi))
-        && last_round_value !== decoded_data["rounds"]
-        && session_on == true
-	  ) {
-      
-    //console.log("Writing on Influx the data of " + peripheral.address);
-    decoded_data["session_id"] = session_id;
-    influx.write(decoded_data);
-  }
-
-  last_round_value = decoded_data["rounds"];
-  last_movement_counter = decoded_data["movement_counter"];
-
-}
-
-function send_to_socket(socket_current_mac, session_id) {
-  let packet = JSON.stringify({
-    diecutter_id : socket_current_mac,
-    session_id : session_id
-  });
-
-  console.log("INVIATO " + packet);
-
-  //client.write(packet); 
-}
-
-function decode(data) {
-  let measurement = {};
-
-  measurement["data_format"] = data.slice(0, 1).readInt8();
-  measurement["temperature"] = data.slice(1, 3).readInt16BE() / 200;
-  measurement["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
-  measurement["pressure"] = data.slice(5, 7).readUInt16BE() + 50000;
-  measurement["acceleration_x"] = data.slice(7,9).readInt16BE() / 1000;
-  measurement["acceleration_y"] = data.slice(9,11).readInt16BE() / 1000;
-  measurement["acceleration_z"] = data.slice(11,13).readInt16BE() / 1000;
-      
-  let power_info = data.slice(13,15).readInt16BE();
-
-  if ((power_info >>> 5) != 0b11111111111) {
-    measurement["battery_voltage"] = (power_info >>> 5) / 1000 + 1.6;
+  function get_closer_ruuvi(ruuvi_list) {
+    let closer_ruuvi;
+    let closer_rssi = -500;
+  
+    for (let i = 0; i < ruuvi_list.length; i++) {
+      if (ruuvi_list[i].rssi > closer_rssi) {
+        closer_rssi = ruuvi_list[i].rssi;
+        closer_ruuvi = ruuvi_list[i];
+      };
+    }
+  
+    return closer_ruuvi;
   }
   
-  if ((power_info & 0b11111) != 0b11111) {
-    measurement["tx_power"] = (power_info & 0b11111) * 2 - 40;
+  function create_ruuvi(ruuvi_list, mac, rssi) {
+    let kf = new KalmanFilter({R: R, Q: Q});
+    let ruuvi = new RuuviTag(mac, rssi, false, 0, kf);
+    ruuvi_list.push(ruuvi);
+    
+    return ruuvi;
   }
-
-  measurement["movement_counter"] = data.slice(15,16).readUInt8();
-  measurement["sequence_number"] = data.slice(16,18).readUInt16BE();
-  measurement["rounds"] = data.slice(18,24).readUIntBE(0,6);
-
-  return measurement;
-}
-
-function recover_adapter() {
-  console.error("ADAPTER STUCK: cannot receive any bluetooth packet");
-  statusEmitter.emit('error_adapter_stuck');
-  noble.stopScanningAsync();
-}
-
-function no_ruuvi_around() {
-  statusEmitter.emit('disconnected');
-  console.log("No RuuviTag around.");
-  clearInterval(idInterval);
-  clearInterval(idRuuvi);
-  first_data = true;
-}
-
-function is_ruuvi_packet(ble_raw_data) {
-	let is_ruuvi_packet = Boolean(ble_raw_data && 
-								  ble_raw_data.length == 26 && 
-						  		  ble_raw_data[0] == 0x99 && 
-						  		  ble_raw_data[1] == 0x04 && 
-						  		  ble_raw_data[2] == 5);
-
-	return is_ruuvi_packet;
-}
-
-function updateList(array, value) {
-  if (array.indexOf(value) === -1)
-    array.push(value)
-}
-
-/*
-* If the objects in the dictionary are greater than the items in the list,
-* delete the objects in the dictionary that are not in the list.
-* Aftet that, make the list empty.
-*/
-function checkList() {
-  if (Object.keys(actual_mac).length > temporary_mac.length) {
-    for (let key in actual_mac) {
-      if (temporary_mac.indexOf(key) === -1) delete actual_mac[`${key}`];
+  
+  function update_rssi(ruuvi_list, ruuvi_index_list, rssi) {
+    let filtered_rssi = ruuvi_list[ruuvi_index_list].kalman.filter(rssi); 
+    ruuvi_list[ruuvi_index_list].rssi = filtered_rssi;
+    return ruuvi_list[ruuvi_index_list];
+  }
+  
+  function send_to_socket(socket_current_mac, session_id) {
+    let packet = JSON.stringify({
+      diecutter_id : socket_current_mac,
+      session_id : session_id
+    });
+  
+    console.log("INVIATO " + packet);
+  
+    //client.write(packet); 
+  }
+  
+  function decode(data, mac) {
+    let measurement = {};
+  
+    measurement["data_format"] = data.slice(0, 1).readInt8();
+    measurement["temperature"] = data.slice(1, 3).readInt16BE() / 200;
+    measurement["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
+    measurement["pressure"] = data.slice(5, 7).readUInt16BE() + 50000;
+    measurement["acceleration_x"] = data.slice(7,9).readInt16BE() / 1000;
+    measurement["acceleration_y"] = data.slice(9,11).readInt16BE() / 1000;
+    measurement["acceleration_z"] = data.slice(11,13).readInt16BE() / 1000;
+        
+    let power_info = data.slice(13,15).readInt16BE();
+  
+    if ((power_info >>> 5) != 0b11111111111) {
+      measurement["battery_voltage"] = (power_info >>> 5) / 1000 + 1.6;
     }
+    
+    if ((power_info & 0b11111) != 0b11111) {
+      measurement["tx_power"] = (power_info & 0b11111) * 2 - 40;
+    }
+  
+    measurement["movement_counter"] = data.slice(15,16).readUInt8();
+    measurement["sequence_number"] = data.slice(16,18).readUInt16BE();
+    measurement["rounds"] = data.slice(18,24).readUIntBE(0,6);
+  
+    measurement["mac"] = mac;
+  
+    return measurement;
   }
-  temporary_mac = [];
+  
+  function recover_adapter() {
+    console.error("ADAPTER STUCK: cannot receive any bluetooth packet");
+    statusEmitter.emit('error_adapter_stuck');
+    noble.stopScanningAsync();
+  }
+  
+  function no_ruuvi_around() {
+    statusEmitter.emit('disconnected');
+    console.log("No RuuviTag around.");
+    clearInterval(update_ruuvi_list_timeout);
+    clearInterval(no_ruuvi_timeout);
+    first_ruuvi_packet = true;
+  }
+  
+  function is_ruuvi_packet(ble_raw_data) {
+    let is_ruuvi_packet = Boolean(ble_raw_data && 
+                    ble_raw_data.length == 26 && 
+                      ble_raw_data[0] == 0x99 && 
+                      ble_raw_data[1] == 0x04 && 
+                      ble_raw_data[2] == 5);
+  
+    return is_ruuvi_packet;
+  }
+  
+  function update_temporary_list(array, value) {
+    if (array.indexOf(value) === -1)
+      array.push(value)
+  }
+  
+  function is_mac_in_ruuvi_list(ruuvi_list, mac) {
+    for (let i = 0; i < ruuvi_list.length; i++) {
+      if (mac == ruuvi_list[i].mac) return i;
+    }
+    return -1;
+  }
+  
+  /*
+  * If the objects in the dictionary are greater than the items in the list,
+  * delete the objects in the dictionary that are not in the list.
+  * Aftet that, make the list empty.
+  */
+  function update_ruuvi_list() {
+    if (ruuvi_list.length > temporary_list.length) {
+      for (let i = 0; i < ruuvi_list.length; i++) {
+        if (temporary_list.indexOf(ruuvi_list[i].mac) === -1) {
+          ruuvi_list.splice(i, 1);
+          i--;
+        }
+      }
+    }
+    temporary_list = [];
+  }
+
+}
+
+function setRounds(result){
+  last_round_value = result;
+}
+
+function setSession(result){
+  session_id = result;
+}
+
+
+module.exports = {
+  statusEmitter,
+  start_exploring
 }
 
 /*
 * Append in the dictionary the MAC address associated to the rssi value.
 * If the MAC address is already in the dictionary, the rssi is updated.
 * Return the MAC addres with the greater rssi.
-*/
+
 function updateDictionary(dict, mac, rssi) {
   if (dict.hasOwnProperty(mac)) dict[`${mac}`] = rssi;
   else dict[`${mac}`] = rssi;
 
   return Object.keys(dict).reduce((a, b) => dict[a] > dict[b] ? a : b);
 }
-
-function setRounds(result){
-  last_round_value = result;
-  //console.log("last_round " + last_round_value);
-}
-
-function setSession(result){
-  session_id = result;
-  //console.log("session_id " + session_id);
-}
-
-module.exports = {
-  statusEmitter,
-  explore
-}
+*/

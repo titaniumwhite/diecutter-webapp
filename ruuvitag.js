@@ -1,23 +1,25 @@
-
-class RuuviTag {
-    constructor(mac, rssi, in_session, kalman) {
-        this.mac = mac;
-        this.rssi = rssi;
-        this.in_session = in_session;
-        this.kalman = kalman;
+module.exports= class RuuviTag {
+    constructor(mac, rssi, in_session, session_id, kalman) {
+        this._mac = mac;
+        this._rssi = rssi;
+        this._in_session = in_session;
+        this._session_id = session_id;
+        this._kalman = kalman;
     }
 
-    get get_mac() { return this.mac; }
-    get get_rssi() { return this.rssi; }
-    get get_in_session() { return this.in_session; }
-    get get_kalman() { return this.kalman; }
+    get mac() { return this._mac; }
+    get rssi() { return this._rssi; }
+    get in_session() { return this._in_session; }
+    get session_id() { return this._session_id; }
+    get kalman() { return this._kalman; }
+    get increase_session_id() { return this.increase(); }
 
-    set set_rssi(rssi) { 
-        this.rssi = this.kalman(rssi);
-    }
+    set rssi(rssi) { this._rssi = rssi; }
+    set in_session(in_session) { this._in_session = in_session; }
+    set session_id(session_id) { this._session_id = session_id; }
 
-    set set_in_session(in_session) {
-        this.in_session = in_session;
+    increase() {
+        return this.session_id++;
     }
 
 }

@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname+"/views/home.html");
 });
 
-noblejs.explore();
+noblejs.start_exploring();
 
 function eventSource_handler() {
   app.get('/status', function(req, res) {
