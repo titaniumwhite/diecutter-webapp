@@ -1,19 +1,30 @@
 const noble = require('@abandonware/noble');
 const influx = require('./influx');
 const { EventEmitter } = require('events');
+const net = require('net');
+const KalmanFilter = require('kalmanjs');
 
 const statusEmitter = new EventEmitter();
+const client = new net.Socket();
 
 let actual_mac = {};
 let temporary_mac = [];
 let idInterval; // after 15 seconds, delete the unnecessary objects in the dectionary and initialize the list
 let idRuuvi; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
 let idGlobal; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
-let first_data = true;
-let session_on = false;
+let first_data = true; // boolean to check whether it is the first packet received 
+let session_on = false; // boolean to check whether we are currently in a session, according to the movement_counter
 let session_id = 0;
 let last_round_value = -1;
 let last_movement_counter = 0;
+let socket_already_sent = false;
+let socket_current_mac; // diecutter_id
+
+/*
+client.connect(2345, '127.0.0.1', function() {
+  console.log("Connected to Python module");
+})
+*/
 
 influx.getLastRound(setRounds);
 influx.getLastSession(setSession);
@@ -38,16 +49,6 @@ function explore() {
   });
 
   noble.on('discover', on_discovery);
-}
-
-function is_ruuvi_packet(ble_raw_data) {
-	let is_ruuvi_packet = Boolean(ble_raw_data && 
-								  ble_raw_data.length == 26 && 
-						  		  ble_raw_data[0] == 0x99 && 
-						  		  ble_raw_data[1] == 0x04 && 
-						  		  ble_raw_data[2] == 5);
-
-	return is_ruuvi_packet;
 }
 
 function on_discovery(peripheral) {
@@ -80,19 +81,35 @@ function on_discovery(peripheral) {
   decoded_data["mac"] = peripheral.address;
 
   console.log('Packet from ' + peripheral.address + ' movement counter -> ' + decoded_data["movement_counter"]);
-/*
+
   if ( (decoded_data["movement_counter"] > 0 && session_on == false) 
     || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
     session_id++;
     session_on = true;
+    if (socket_current_mac != decoded_data["mac"]) {
+      socket_current_mac = decoded_data["mac"];
+      socket_already_sent = false;
+    }
   } else if (decoded_data["movement_counter"] == 0 && session_on == true) {
     session_on = false;
-  }*/
+  }
+
+  if (session_on == true && socket_already_sent == false) {
+    socket_already_sent = true;
+    socket_current_mac = decoded_data["mac"];
+    send_to_socket(socket_current_mac, session_id);
+  }
+
+  /*
+  * TBD: gestire il caso in cui il RuuviTag più lontano inizia la sessione e rimane in sessione
+  *      e successivamente il RuuviTag più vicino inizia la sessione. In tal caso, 
+  *      verrebbero scritti i pacchetti del RuuviTag più lontano fin quando rimane in sessione.
+  */
 
   // write in the database only the packet of the closer device
   if ((peripheral.address === updateDictionary(actual_mac, peripheral.address, peripheral.rssi))
         && last_round_value !== decoded_data["rounds"]
-        /*&& session_on == true*/
+        && session_on == true
 	  ) {
       
     //console.log("Writing on Influx the data of " + peripheral.address);
@@ -105,7 +122,16 @@ function on_discovery(peripheral) {
 
 }
 
+function send_to_socket(socket_current_mac, session_id) {
+  let packet = JSON.stringify({
+    diecutter_id : socket_current_mac,
+    session_id : session_id
+  });
 
+  console.log("INVIATO " + packet);
+
+  //client.write(packet); 
+}
 
 function decode(data) {
   let measurement = {};
@@ -147,6 +173,16 @@ function no_ruuvi_around() {
   clearInterval(idInterval);
   clearInterval(idRuuvi);
   first_data = true;
+}
+
+function is_ruuvi_packet(ble_raw_data) {
+	let is_ruuvi_packet = Boolean(ble_raw_data && 
+								  ble_raw_data.length == 26 && 
+						  		  ble_raw_data[0] == 0x99 && 
+						  		  ble_raw_data[1] == 0x04 && 
+						  		  ble_raw_data[2] == 5);
+
+	return is_ruuvi_packet;
 }
 
 function updateList(array, value) {
