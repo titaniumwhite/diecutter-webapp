@@ -1,6 +1,7 @@
 /*
-* TODO : quando ci sono due RuuviTag, invia alternativamente il pacchetto socket. Gestire il caso, facendo in modo
-*        che invii il pacchetto solo del Ruuvi più vicino attivo.
+* TODO : prendere l'ultimo session id con una get.
+* todo : inviare un pacchetto quando inizia sessione e quando finisce sessione.
+* TODO : gestire i casi con più ruuvitag.
 * TODO : pulire il codice, eliminare le variabili globali.
 */
 
@@ -27,13 +28,11 @@ let last_round_value = -1;
 let last_movement_counter = 0;
 let socket_already_sent = false;
 let socket_current_mac; // diecutter_id
-
 /*
 client.connect(2345, '127.0.0.1', function() {
   console.log("Connected to Python module");
 })
 */
-
 influx.getLastRound(setRounds);
 influx.getLastSession(setSession);
 
@@ -83,22 +82,20 @@ function start_exploring() {
     // if no ruuvi packets for 120 seconds, there isn't any ruuvi around
     clearTimeout(no_ruuvi_timeout);
     no_ruuvi_timeout = setTimeout(no_ruuvi_around, 120000);
-
-    // first ruuvi packet received
-    if (first_ruuvi_packet) {
-      update_ruuvi_list_timeout = setInterval(() => { update_ruuvi_list(ruuvi_list) }, 120000);
+    
+    if (first_ruuvi_packet){
+      setInterval(() => { update_ruuvi_list(ruuvi_list) }, 30000);
       first_ruuvi_packet = false;
     }
           
     update_temporary_list(temporary_list, mac);
 
-    let ruuvi_index_list = is_mac_in_ruuvi_list(ruuvi_list, mac);
-    if (ruuvi_index_list != -1)
-      ruuvi = update_rssi(ruuvi_list, ruuvi_index_list, rssi);
-    else 
-      ruuvi = create_ruuvi(ruuvi_list, mac, rssi);
-
-    console.log('Packet from ' + peripheral.address + ' movement counter -> ' + decoded_data["movement_counter"]);
+    /*
+    * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
+    * Otherwise, create a new ruuvi and put it in the list.
+    */
+    ruuvi = update_list_or_create_ruuvi(ruuvi_list, mac, rssi);
+    console.log('Kalman RSSI ' + ruuvi.rssi + '  true RSSI -> ' + peripheral.rssi + '  mov_counter ' + decoded_data["movement_counter"]);
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
@@ -106,10 +103,12 @@ function start_exploring() {
       || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
       ruuvi.increase_session_id;
       ruuvi.in_session = true;
+
       if (socket_current_mac != ruuvi.mac) {
         socket_current_mac = ruuvi.mac;
         socket_already_sent = false;
       }
+
     } else if (decoded_data["movement_counter"] == 0 && ruuvi.in_session == true) {
       ruuvi.in_session = false;
     }
@@ -117,7 +116,7 @@ function start_exploring() {
     if (ruuvi.in_session == true && socket_already_sent == false) {
       socket_already_sent = true;
       socket_current_mac = ruuvi.mac;
-      send_to_socket(socket_current_mac, ruuvi.session_id);
+      //send_to_socket(socket_current_mac, ruuvi.session_id);
     }
 
     // write in the database only the packet of the closer device
@@ -172,7 +171,7 @@ function start_exploring() {
   
     console.log("INVIATO " + packet);
   
-    //client.write(packet); 
+    client.write(packet); 
   }
   
   function decode(data, mac) {
@@ -214,7 +213,6 @@ function start_exploring() {
   function no_ruuvi_around() {
     statusEmitter.emit('disconnected');
     console.log("No RuuviTag around.");
-    clearInterval(update_ruuvi_list_timeout);
     clearInterval(no_ruuvi_timeout);
     first_ruuvi_packet = true;
   }
@@ -234,11 +232,11 @@ function start_exploring() {
       array.push(value)
   }
   
-  function is_mac_in_ruuvi_list(ruuvi_list, mac) {
+  function update_list_or_create_ruuvi(ruuvi_list, mac, rssi) {
     for (let i = 0; i < ruuvi_list.length; i++) {
-      if (mac == ruuvi_list[i].mac) return i;
+      if (mac == ruuvi_list[i].mac) return update_rssi(ruuvi_list, i, rssi);
     }
-    return -1;
+    return create_ruuvi(ruuvi_list, mac, rssi);
   }
   
   /*

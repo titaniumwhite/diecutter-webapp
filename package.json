@@ -12,6 +12,7 @@
         "express": "^4.0.0",
         "influx": "^5.7.0",
         "jquery": "^3.5.1",
+        "kalmanjs": "^1.1.0",
         "log-timestamp": "^0.3.0",
         "net": "^1.0.2",
         "nodemon": "^2.0.7",

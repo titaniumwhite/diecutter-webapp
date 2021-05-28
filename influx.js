@@ -8,12 +8,11 @@ const influx = new Influx.InfluxDB({
         measurement: 'ruuvi',
         fields: {
           mac: Influx.FieldType.STRING,
-          acceleration_x: Influx.FieldType.FLOAT,
-          acceleration_y: Influx.FieldType.FLOAT,
-          acceleration_z: Influx.FieldType.FLOAT,
-          sequence_number: Influx.FieldType.INTEGER,
           rounds: Influx.FieldType.INTEGER,
-          session_id: Influx.FieldType.INTEGER
+          session_id: Influx.FieldType.INTEGER,
+          temperature: Influx.FieldType.INTEGER,
+          humidity: Influx.FieldType.INTEGER,
+          pressure: Influx.FieldType.INTEGER
         },
         tags: [
           'host'
@@ -28,12 +27,11 @@ function write(data) {
             measurement: 'ruuvi',
             fields: { 
               mac: data['mac'],
-              acceleration_x: data['acceleration_x'],
-              acceleration_y: data['acceleration_y'],
-              acceleration_z: data['acceleration_z'],
-              sequence_number: data['sequence_number'],
               rounds: data['rounds'],
-              session_id: data['session_id']
+              session_id: data['session_id'],
+              temperature: data['temperature'],
+              humidity: data['humidity'],
+              pressure: data['pressure']
             }
         }
     ], {
