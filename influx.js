@@ -12,7 +12,7 @@ const influx = new Influx.InfluxDB({
           session_id: Influx.FieldType.INTEGER,
           temperature: Influx.FieldType.INTEGER,
           humidity: Influx.FieldType.INTEGER,
-          pressure: Influx.FieldType.INTEGER
+          speed: Influx.FieldType.FLOAT
         },
         tags: [
           'host'
@@ -31,7 +31,7 @@ function write(data) {
               session_id: data['session_id'],
               temperature: data['temperature'],
               humidity: data['humidity'],
-              pressure: data['pressure']
+              speed: data['speed']
             }
         }
     ], {

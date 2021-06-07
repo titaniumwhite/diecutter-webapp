@@ -180,7 +180,7 @@ function start_exploring() {
     measurement["data_format"] = data.slice(0, 1).readInt8();
     measurement["temperature"] = data.slice(1, 3).readInt16BE() / 200;
     measurement["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
-    measurement["pressure"] = data.slice(5, 7).readUInt16BE() + 50000;
+    measurement["speed"] = data.slice(5, 7).readUInt16BE();
     measurement["acceleration_x"] = data.slice(7,9).readInt16BE() / 1000;
     measurement["acceleration_y"] = data.slice(9,11).readInt16BE() / 1000;
     measurement["acceleration_z"] = data.slice(11,13).readInt16BE() / 1000;
