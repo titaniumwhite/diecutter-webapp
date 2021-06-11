@@ -7,6 +7,7 @@
     "dependencies": {
         "@abandonware/bluetooth-hci-socket": "*",
         "@abandonware/noble": "*",
+        "axios": "^0.21.1",
         "cluster": "^0.7.7",
         "console-log-timestamp": "^1.2.1",
         "express": "^4.0.0",
