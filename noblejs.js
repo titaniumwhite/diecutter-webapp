@@ -95,44 +95,51 @@ function start_exploring() {
     * Otherwise, create a new ruuvi and put it in the list.
     */
     ruuvi = update_list_or_create_ruuvi(ruuvi_list, mac, rssi);
-    console.log('Kalman RSSI ' + ruuvi.rssi + '  true RSSI -> ' + peripheral.rssi + '  mov_counter ' + decoded_data["movement_counter"]);
+    console.log('Mac ' + mac + '  Kalman RSSI ' + ruuvi.rssi + '  true RSSI -> ' + peripheral.rssi + '  mov_counter ' + decoded_data["movement_counter"]);
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
-    if ( (decoded_data["movement_counter"] > 0 && ruuvi.in_session == false) 
-      || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != last_movement_counter) ) {
+    if ( (decoded_data["movement_counter"] != 0 && no_ruuvi_in_session()) 
+      || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != ruuvi.mov_counter) ) {
       ruuvi.increase_session_id;
       ruuvi.in_session = true;
 
-      if (socket_current_mac != ruuvi.mac) {
-        socket_current_mac = ruuvi.mac;
-        socket_already_sent = false;
+      if (socket_already_sent == false) {
+        socket_already_sent = true;
+        //send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
+        console.log("Sessione iniziata")
       }
 
     } else if (decoded_data["movement_counter"] == 0 && ruuvi.in_session == true) {
       ruuvi.in_session = false;
-    }
 
-    if (ruuvi.in_session == true && socket_already_sent == false) {
-      socket_already_sent = true;
-      socket_current_mac = ruuvi.mac;
-      //send_to_socket(socket_current_mac, ruuvi.session_id);
+      if (socket_already_sent == true) {
+        socket_already_sent = false;
+        //send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
+        console.log("Sessione terminata")
+      }
     }
 
     // write in the database only the packet of the closer device
-    if (ruuvi === closer_ruuvi && 
-        last_round_value !== decoded_data["rounds"] && 
-        ruuvi.in_session === true
-      ) {
+    if (ruuvi.rounds !== decoded_data["rounds"] && 
+        ruuvi.in_session === true) {
         
-      //console.log("Writing on Influx the data of " + peripheral.address);
       decoded_data["session_id"] = ruuvi.session_id;
       influx.write(decoded_data);
     }
 
-    last_round_value = decoded_data["rounds"];
-    last_movement_counter = decoded_data["movement_counter"];
+    ruuvi.rounds = decoded_data["rounds"];
+    ruuvi.mov_counter = decoded_data["movement_counter"];
 
+  }
+
+  function no_ruuvi_in_session() {
+    for (let i = 0; i < ruuvi_list.length; i++) {
+      if (ruuvi_list[i].in_session) {
+        return false;
+      };
+    } 
+    return true;
   }
 
   function get_closer_ruuvi(ruuvi_list) {
@@ -153,20 +160,26 @@ function start_exploring() {
     let kf = new KalmanFilter({R: R, Q: Q});
     let ruuvi = new RuuviTag(mac, rssi, false, 0, kf);
     ruuvi_list.push(ruuvi);
-    
     return ruuvi;
   }
   
-  function update_rssi(ruuvi_list, ruuvi_index_list, rssi) {
-    let filtered_rssi = ruuvi_list[ruuvi_index_list].kalman.filter(rssi); 
-    ruuvi_list[ruuvi_index_list].rssi = filtered_rssi;
-    return ruuvi_list[ruuvi_index_list];
+  function update_rssi(ruuvi, rssi) {
+    ruuvi.rssi = ruuvi.kalman.filter(50);
+    return ruuvi;
   }
   
-  function send_to_socket(socket_current_mac, session_id) {
+  function update_list_or_create_ruuvi(ruuvi_list, mac, rssi) {
+    for (let i = 0; i < ruuvi_list.length; i++) {
+      if (mac == ruuvi_list[i].mac) return update_rssi(ruuvi_list[i], rssi);
+    }
+    return create_ruuvi(ruuvi_list, mac, rssi);
+  }
+
+  function send_to_socket(socket_current_mac, session_id, in_session) {
     let packet = JSON.stringify({
       diecutter_id : socket_current_mac,
-      session_id : session_id
+      session_id : session_id,
+      in_session : in_session
     });
   
     console.log("INVIATO " + packet);
@@ -230,13 +243,6 @@ function start_exploring() {
   function update_temporary_list(array, value) {
     if (array.indexOf(value) === -1)
       array.push(value)
-  }
-  
-  function update_list_or_create_ruuvi(ruuvi_list, mac, rssi) {
-    for (let i = 0; i < ruuvi_list.length; i++) {
-      if (mac == ruuvi_list[i].mac) return update_rssi(ruuvi_list, i, rssi);
-    }
-    return create_ruuvi(ruuvi_list, mac, rssi);
   }
   
   /*
