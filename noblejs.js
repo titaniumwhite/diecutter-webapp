@@ -91,7 +91,7 @@ function start_exploring() {
     update_temporary_list(temporary_list, mac);
 
     /*
-    * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
+    * If ruuvi is already in ruuvi_list, update the rssi with the Kalman Filter.
     * Otherwise, create a new ruuvi and put it in the list.
     */
     ruuvi = update_list_or_create_ruuvi(ruuvi_list, mac, rssi);
