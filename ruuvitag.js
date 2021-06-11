@@ -14,7 +14,10 @@ module.exports= class RuuviTag {
     get in_session() { return this._in_session; }
     get session_id() { return this._session_id; }
     get kalman() { return this._kalman; }
+    get mov_counter() { return this._mov_counter; }
+    get rounds() { return this._rounds; }
     get increase_session_id() { return this.increase(); }
+
 
     set rssi(rssi) { this._rssi = rssi; }
     set rounds(rounds) { this._rounds = rounds; }

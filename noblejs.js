@@ -94,8 +94,8 @@ function start_exploring() {
     * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
     * Otherwise, create a new ruuvi and put it in the list.
     */
-    ruuvi = update_list_or_create_ruuvi(ruuvi_list, mac, rssi);
-    console.log('Mac ' + mac + '  Kalman RSSI ' + ruuvi.rssi + '  true RSSI -> ' + peripheral.rssi + '  mov_counter ' + decoded_data["movement_counter"]);
+    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["movement_counter"]);
+    console.log('mac ' + mac + '  Kalman RSSI ' + ruuvi.rssi + '  true RSSI -> ' + peripheral.rssi + '  mov_counter ' + decoded_data["movement_counter"]);
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
@@ -120,6 +120,7 @@ function start_exploring() {
       }
     }
 
+    console.log("Ruuvi rounds " + ruuvi.rounds + "Decoded rounds " + decoded_data["rounds"]);
     // write in the database only the packet of the closer device
     if (ruuvi.rounds !== decoded_data["rounds"] && 
         ruuvi.in_session === true) {
@@ -156,23 +157,21 @@ function start_exploring() {
     return closer_ruuvi;
   }
   
-  function create_ruuvi(ruuvi_list, mac, rssi) {
+  function create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter) {
     let kf = new KalmanFilter({R: R, Q: Q});
-    let ruuvi = new RuuviTag(mac, rssi, false, 0, kf);
+    let ruuvi = new RuuviTag(mac, rssi, false, 0, 0, mov_counter, kf);
     ruuvi_list.push(ruuvi);
     return ruuvi;
   }
-  
-  function update_rssi(ruuvi, rssi) {
-    ruuvi.rssi = ruuvi.kalman.filter(50);
-    return ruuvi;
-  }
-  
-  function update_list_or_create_ruuvi(ruuvi_list, mac, rssi) {
+   
+  function update_or_create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter) {
     for (let i = 0; i < ruuvi_list.length; i++) {
-      if (mac == ruuvi_list[i].mac) return update_rssi(ruuvi_list[i], rssi);
+      if (mac == ruuvi_list[i].mac) {
+        ruuvi_list[i].rssi = ruuvi_list[i].kalman.filter(rssi);
+        return ruuvi_list[i];
+      };
     }
-    return create_ruuvi(ruuvi_list, mac, rssi);
+    return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
   }
 
   function send_to_socket(socket_current_mac, session_id, in_session) {
