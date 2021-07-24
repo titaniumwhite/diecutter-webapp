@@ -20,6 +20,7 @@ let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there is
 let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
 let first_ruuvi_packet = true; // boolean to check whether it is the first packet received 
 let socket_already_sent = false;
+let ruuvi_mac_in_session = null;
 /*
 client.connect(2345, '127.0.0.1', function() {
   console.log("Connected to Python module");
@@ -87,7 +88,7 @@ function start_exploring() {
     * Otherwise, create a new ruuvi and put it in the list.
     */
     ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["movement_counter"]);
-    console.log('mac ' + mac + '  Kalman RSSI ' + ruuvi.rssi + '  true RSSI -> ' + peripheral.rssi + '  mov_counter ' + decoded_data["movement_counter"]);
+    console.log('mac ' + mac + '   rounds ' + decoded_data["rounds"] + '  mov_counter ' + decoded_data["movement_counter"]);
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
@@ -100,17 +101,19 @@ function start_exploring() {
       ruuvi.in_session = true;
 
       if (socket_already_sent == false) {
+        ruuvi_mac_in_session = ruuvi.mac;
         socket_already_sent = true;
-        //send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
+        send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
         console.log("Sessione iniziata")
       }
 
-    } else if (decoded_data["movement_counter"] == 0 && ruuvi.in_session == true) {
+    } else if (decoded_data["movement_counter"] == 0 && ruuvi_mac_in_session !== null && ruuvi_mac_in_session === ruuvi.mac) {
       ruuvi.in_session = false;
 
       if (socket_already_sent == true) {
+        ruuvi_mac_in_session = null;
         socket_already_sent = false;
-        //send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
+        send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
         console.log("Sessione terminata")
       }
     }
@@ -200,7 +203,7 @@ function start_exploring() {
   
     console.log("INVIATO " + packet);
   
-    client.write(packet); 
+    //client.write(packet); 
   }
   
   function decode(data, mac) {
