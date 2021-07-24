@@ -15,6 +15,7 @@ const Q = 3;
 
 const client = new net.Socket();
 
+let previous_ble_packet = {}; // previous packet received over BLE
 let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
@@ -205,35 +206,77 @@ function start_exploring() {
   
     //client.write(packet); 
   }
+
+  function compute_rotations(prev_date, curr_date, speed, previous_rotations){
+    let time_diff = (curr_date - prev_date)/1000;
+    let new_rotations = time_diff * speed;
+    let total_rotations = Math.round(previous_rotations + new_rotations);
+    return total_rotations;
+  }
   
   function decode(data, mac) {
-    let measurement = {};
-  
-    measurement["data_format"] = data.slice(0, 1).readInt8();
-    measurement["temperature"] = data.slice(1, 3).readInt16BE() / 200;
-    measurement["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
-    measurement["speed"] = data.slice(5, 7).readUInt16BE() / 1000;
-    measurement["acceleration_x"] = data.slice(7,9).readInt16BE() / 1000;
-    measurement["acceleration_y"] = data.slice(9,11).readInt16BE() / 1000;
-    measurement["acceleration_z"] = data.slice(11,13).readInt16BE() / 1000;
-        
+    let ble_packet = {};
+
+    ble_packet["timestamp"] = new Date();
+    
+    ble_packet["mac"] = mac;
+    ble_packet["data_format"] = data.slice(0, 1).readInt8();
+    
+    // parse environmental data
+    ble_packet["temperature"] = data.slice(1, 3).readInt16BE() / 200;
+    ble_packet["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
+
+    // parse acceleration data
+    ble_packet["acceleration_x"] = data.slice(7,9).readInt16BE() / 1000;
+    ble_packet["acceleration_y"] = data.slice(9,11).readInt16BE() / 1000;
+    ble_packet["acceleration_z"] = data.slice(11,13).readInt16BE() / 1000;
+    
+
+    // parse transmission power
     let power_info = data.slice(13,15).readInt16BE();
   
     if ((power_info >>> 5) != 0b11111111111) {
-      measurement["battery_voltage"] = (power_info >>> 5) / 1000 + 1.6;
+      ble_packet["battery_voltage"] = (power_info >>> 5) / 1000 + 1.6;
     }
     
     if ((power_info & 0b11111) != 0b11111) {
-      measurement["tx_power"] = (power_info & 0b11111) * 2 - 40;
+      ble_packet["tx_power"] = (power_info & 0b11111) * 2 - 40;
     }
   
-    measurement["movement_counter"] = data.slice(15,16).readUInt8();
-    measurement["sequence_number"] = data.slice(16,18).readUInt16BE();
-    measurement["rounds"] = data.slice(18,24).readUIntBE(0,6);
+    ble_packet["movement_counter"] = data.slice(15,16).readUInt8();
+    ble_packet["sequence_number"] = data.slice(16,18).readUInt16BE();
+    
+    // parse rotation related data
+    // rotation speed 
+    ble_packet["speed"] = data.slice(5, 7).readUInt16BE() / 1000;
+
+    // number of rounds
+    let num_rotations = data.slice(18,24).readUIntBE(0,6);
+    
+    if (Object.keys(previous_ble_packet).length === 0 ||
+        previous_ble_packet["mac"] !== ble_packet["mac"] ||
+        previous_ble_packet["movement_counter"] !== ble_packet["movement_counter"]){
+
+
+      ble_packet["rounds"] = num_rotations;
+    
+    }
+
+    else {
+
+      let prev_date = previous_ble_packet["timestamp"];
+      let curr_date = ble_packet["timestamp"];
+      let speed = ble_packet["speed"];
+      let previous_rotations = previous_ble_packet["rounds"];
+      
+      ble_packet["rounds"] = compute_rotations(prev_date, curr_date, speed, previous_rotations);
+
+    }
+    
+    // update previous ble packet
+    previous_ble_packet = ble_packet;
   
-    measurement["mac"] = mac;
-  
-    return measurement;
+    return ble_packet;
   }
   
   function recover_adapter() {
