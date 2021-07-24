@@ -93,25 +93,28 @@ function start_exploring() {
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
-    if ( (decoded_data["movement_counter"] != 0 && ruuvi_mac_in_session === null) 
-      || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != ruuvi.mov_counter) ) {
-      
-      //get_session_id();
-      
-      ruuvi.increase_session_id;
+    if (decoded_data["movement_counter"] != 0
+    || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != ruuvi.mov_counter)
+    ) {
       ruuvi.in_session = true;
+    }
+    else if (decoded_data["movement_counter"] == 0) ruuvi.in_session = false;
 
-      if (socket_already_sent == false) {
+    
+    if (ruuvi.in_session && ruuvi_mac_in_session === null) {
+           
+      ruuvi.increase_session_id;
+
+      if (socket_already_sent === false) {
         ruuvi_mac_in_session = ruuvi.mac;
         socket_already_sent = true;
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
         console.log("Sessione iniziata")
       }
 
-    } else if (decoded_data["movement_counter"] == 0 && ruuvi_mac_in_session !== null && ruuvi_mac_in_session === ruuvi.mac) {
-      ruuvi.in_session = false;
+    } else if ( !ruuvi.in_session && ruuvi_mac_in_session !== null && ruuvi_mac_in_session === ruuvi.mac) {
 
-      if (socket_already_sent == true) {
+      if (socket_already_sent === true) {
         ruuvi_mac_in_session = null;
         socket_already_sent = false;
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
