@@ -93,7 +93,7 @@ function start_exploring() {
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
-    if ( (decoded_data["movement_counter"] != 0 && no_ruuvi_in_session()) 
+    if ( (decoded_data["movement_counter"] != 0 && ruuvi_mac_in_session === null) 
       || (decoded_data["movement_counter"] != 0 && decoded_data["movement_counter"] != ruuvi.mov_counter) ) {
       
       //get_session_id();
