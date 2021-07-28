@@ -20,8 +20,8 @@ let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
 let first_ruuvi_packet = true; // boolean to check whether it is the first packet received 
-let socket_already_sent = false;
-let ruuvi_mac_in_session = null;
+let socket_already_sent = {};  // now we support a set of ruuvitag in session via socket ...
+let ruuvi_mac_in_session = {}; // ... and here in local: both are maps of (MAC_ADDRESS,boolean)
 let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for 3 minutes
                             before the movement counter is set to 0, the end session message is sent */
 /*
@@ -100,34 +100,36 @@ function start_exploring() {
 
 
     // if no message has been sent to Flavia, do it
-    if (ruuvi.in_session && ruuvi_mac_in_session === null) {
+    if (ruuvi.in_session && 
+      (ruuvi_mac_in_session[ruuvi.mac] === undefined || ruuvi_mac_in_session[ruuvi.mac] === false)) {
 
-      if (socket_already_sent === false) {
-        ruuvi_mac_in_session = ruuvi.mac;
-        socket_already_sent = true;
+      if (socket_already_sent[ruuvi.mac] === undefined || socket_already_sent[ruuvi.mac] === false) {
+        ruuvi_mac_in_session[ruuvi.mac] = true;
+        socket_already_sent[ruuvi.mac] = true;
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
-        console.log("Sessione iniziata")
+        console.log("Sessione iniziata per "+ ruuvi.mac)
       }
 
-    } else if (!ruuvi.in_session && ruuvi_mac_in_session !== null && ruuvi_mac_in_session === ruuvi.mac) {
+    } else if (!ruuvi.in_session && ruuvi_mac_in_session[ruuvi.mac] !== undefined 
+      && ruuvi_mac_in_session[ruuvi.mac] === true) {
 
-      if (socket_already_sent === true) {
-        ruuvi_mac_in_session = null;
-        socket_already_sent = false;
+      if (socket_already_sent[ruuvi.mac] === true) {
+        ruuvi_mac_in_session[ruuvi.mac] = false;
+        socket_already_sent[ruuvi.mac] = false;
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
-        console.log("Sessione terminata")
+        console.log("Sessione terminata per "+ ruuvi.mac)
       }
     }
 
     /* if the ruuvi monitored by Flavia is out of range for 3 minutes
     before the movement counter is set to 0, the end session message is sent */
-    if (ruuvi_mac_in_session === ruuvi.mac && socket_already_sent === true) {
+    if (ruuvi_mac_in_session[ruuvi.mac] === true && socket_already_sent[ruuvi.mac] === true) {
       clearTimeout(end_session_timeout);
       ruuvi_to_end = ruuvi;
       end_session_timeout = setTimeout(() => { end_session(ruuvi_to_end); }, 180000);
     }
 
-    // write in the database only the packet of the closer device
+    // write in the database only the packet of the closer device [WIP]
     if (ruuvi.rounds !== decoded_data["rounds"] && 
         ruuvi.in_session === true) {
         
@@ -166,12 +168,12 @@ function start_exploring() {
   
   function end_session(ruuvi) {
     ruuvi.in_session = false;
-    ruuvi_mac_in_session = null;
+    ruuvi_mac_in_session[ruuvi.mac] = false;
 
-    if (socket_already_sent) {
+    if (socket_already_sent[ruuvi.mac]) {
       console.log("Sessione terminata, il ruuvitag in sessione non è nei paraggi da 3 minuti")
       send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
-      socket_already_sent = false;
+      socket_already_sent[ruuvi.mac] = false;
     }
 
   }
