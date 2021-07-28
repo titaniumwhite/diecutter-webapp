@@ -15,7 +15,6 @@ const Q = 3;
 
 const client = new net.Socket();
 
-let previous_ble_packet = {}; // previous packet received over BLE
 let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
@@ -83,7 +82,7 @@ function start_exploring() {
     * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
     * Otherwise, create a new ruuvi and put it in the list.
     */
-    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["movement_counter"]);
+    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data);
     console.log('mac ' + mac + '   rounds ' + decoded_data["rounds"] + '  mov_counter ' + decoded_data["movement_counter"]);
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
@@ -208,14 +207,44 @@ function start_exploring() {
     return ruuvi;
   }
    
-  function update_or_create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter) {
+  function update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data) {
+
     for (let i = 0; i < ruuvi_list.length; i++) {
+      
       if (mac == ruuvi_list[i].mac) {
-        ruuvi_list[i].rssi = ruuvi_list[i].kalman.filter(rssi);
-        return ruuvi_list[i];
+
+        let selected_ruuvi = ruuvi_list[i];
+        selected_ruuvi.rssi = selected_ruuvi.kalman.filter(rssi);
+        
+        let current_rotations = decoded_data["rounds"];
+        let current_raw_session = decoded_data["movement_counter"];
+        let current_timestamp = new Date();
+
+        if (current_raw_session > 0 && 
+            current_raw_session === selected_ruuvi.prev_raw_session){
+          // recompute "current_rotations" variable and
+          // update "rounds" field in "decoded_data" object
+          
+          let current_speed = decoded_data["speed"];
+
+          current_rotations = compute_rotations(selected_ruuvi.prev_timestamp,
+                                                current_timestamp,
+                                                current_speed, 
+                                                selected_ruuvi.prev_rotations);
+
+          decoded_data["rounds"] = current_rotations;
+        }
+
+        // update prev variables
+        selected_ruuvi.prev_raw_session = current_raw_session;
+        selected_ruuvi.prev_rotations = current_rotations;
+        selected_ruuvi.prev_timestamp = current_timestamp;
+        
+        return selected_ruuvi;
       };
     }
-    return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
+
+    return create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["mov_counter"]);
   }
 
   function send_to_socket(socket_current_mac, session_id, in_session) {
@@ -234,13 +263,12 @@ function start_exploring() {
     let time_diff = (curr_date - prev_date)/1000;
     let new_rotations = time_diff * speed;
     let total_rotations = Math.round(previous_rotations + new_rotations);
+    
     return total_rotations;
   }
   
   function decode(data, mac) {
     let ble_packet = {};
-
-    ble_packet["timestamp"] = new Date();
     
     ble_packet["mac"] = mac;
     ble_packet["data_format"] = data.slice(0, 1).readInt8();
@@ -270,34 +298,8 @@ function start_exploring() {
     ble_packet["sequence_number"] = data.slice(16,18).readUInt16BE();
     
     // parse rotation related data
-    // rotation speed 
     ble_packet["speed"] = data.slice(5, 7).readUInt16BE() / 1000;
-
-    // number of rounds
-    let num_rotations = data.slice(18,24).readUIntBE(0,6);
-    
-    if (Object.keys(previous_ble_packet).length === 0 ||
-        previous_ble_packet["mac"] !== ble_packet["mac"] ||
-        previous_ble_packet["movement_counter"] !== ble_packet["movement_counter"]){
-
-
-      ble_packet["rounds"] = num_rotations;
-    
-    }
-
-    else {
-
-      let prev_date = previous_ble_packet["timestamp"];
-      let curr_date = ble_packet["timestamp"];
-      let speed = ble_packet["speed"];
-      let previous_rotations = previous_ble_packet["rounds"];
-      
-      ble_packet["rounds"] = compute_rotations(prev_date, curr_date, speed, previous_rotations);
-
-    }
-    
-    // update previous ble packet
-    previous_ble_packet = ble_packet;
+    ble_packet["rounds"] = data.slice(18,24).readUIntBE(0,6);
   
     return ble_packet;
   }
