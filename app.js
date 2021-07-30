@@ -15,6 +15,11 @@ const Q = 3;
 
 const client = new net.Socket();
 
+let new_firmware_mac_list = ["da:bc:6e:d4:80:73",
+                             "ee:ea:4b:24:65:33",
+                             "da:5b:93:12:58:30",
+                             "d4:30:15:4a:ab:2d"];
+
 let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
@@ -83,7 +88,24 @@ function start_exploring() {
     * Otherwise, create a new ruuvi and put it in the list.
     */
     ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data);
-    console.log('mac ' + mac + '   rounds ' + decoded_data["rounds"] + '  mov_counter ' + decoded_data["movement_counter"]);
+
+    console.log(`mac: ${mac}`);
+    console.log(`rounds: ${decoded_data["rounds"]}`);
+    console.log(`mov_counter: ${decoded_data["movement_counter"]}`);
+
+    if (new_firmware_mac_list.includes(mac)) {
+      console.log("printing additional debug info:");
+      console.log(`time: ${(new Date()).toLocaleString()}`);
+      console.log(`original speed: ${decoded_data["original_speed"]}`);
+      console.log(`computed_speed: ${decoded_data["speed"]}`);
+      console.log(`input data std: ${decoded_data["input_data_std"]}`);
+      console.log(`max power: ${decoded_data["max_power"]}`);
+      console.log(`freq std: ${decoded_data["freq_std"]}`); 
+    
+    }
+
+    console.log(""); 
+
 
     let closer_ruuvi = get_closer_ruuvi(ruuvi_list);
 
@@ -268,6 +290,7 @@ function start_exploring() {
   }
   
   function decode(data, mac) {
+    
     let ble_packet = {};
     
     ble_packet["mac"] = mac;
@@ -277,26 +300,18 @@ function start_exploring() {
     ble_packet["temperature"] = data.slice(1, 3).readInt16BE() / 200;
     ble_packet["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
 
-    // parse acceleration data
-    ble_packet["acceleration_x"] = data.slice(7,9).readInt16BE() / 1000;
-    ble_packet["acceleration_y"] = data.slice(9,11).readInt16BE() / 1000;
-    ble_packet["acceleration_z"] = data.slice(11,13).readInt16BE() / 1000;
-    
-
-    // parse transmission power
-    let power_info = data.slice(13,15).readInt16BE();
-  
-    if ((power_info >>> 5) != 0b11111111111) {
-      ble_packet["battery_voltage"] = (power_info >>> 5) / 1000 + 1.6;
-    }
-    
-    if ((power_info & 0b11111) != 0b11111) {
-      ble_packet["tx_power"] = (power_info & 0b11111) * 2 - 40;
+    // parse debug data
+    if (new_firmware_mac_list.includes(mac)) {
+      
+      ble_packet["new_session_id"] = data.slice(7,9).readInt16BE();
+      ble_packet["original_speed"] = data.slice(9,11).readInt16BE() / 1000;
+      ble_packet["input_data_std"] = data.slice(11,13).readInt16BE() / 1000;
+      ble_packet["max_power"] = data.slice(13,15).readInt16BE();
+      ble_packet["freq_std"] = data.slice(16,18).readUInt16BE() / 1000;
     }
   
     ble_packet["movement_counter"] = data.slice(15,16).readUInt8();
-    ble_packet["sequence_number"] = data.slice(16,18).readUInt16BE();
-    
+
     // parse rotation related data
     ble_packet["speed"] = data.slice(5, 7).readUInt16BE() / 1000;
     ble_packet["rounds"] = data.slice(18,24).readUIntBE(0,6);
