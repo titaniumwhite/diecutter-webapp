@@ -15,10 +15,7 @@ const Q = 3;
 
 const client = new net.Socket();
 
-let new_firmware_mac_list = ["da:bc:6e:d4:80:73",
-                             "ee:ea:4b:24:65:33",
-                             "da:5b:93:12:58:30",
-                             "d4:30:15:4a:ab:2d"];
+let new_firmware_mac_list = ["da:bc:6e:d4:80:73"];
 
 let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
