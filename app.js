@@ -17,6 +17,7 @@ const client = new net.Socket();
 
 // socket exception handling
 client.on('error', function(err){
+    is_connected = false;
     console.log(err);
     sleep(10000).then(() => {
       // Do something after the sleep!
@@ -43,6 +44,7 @@ function connect_to_socket(){
   if(!is_connected){           
     client.connect(2345, '127.0.0.1', function() {
       console.log("Connected to Python module");
+      is_connected = true;
     });
   }
 }
