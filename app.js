@@ -18,8 +18,8 @@ const client = new net.Socket();
 let new_firmware_mac_list = ["da:bc:6e:d4:80:73"];
 
 let temporary_list = [];
-let no_ruuvi_timeout; // if there are no ruuvi packets for 120 seconds, there isn't any ruuvitag around
-let adapter_stuck_timeout; // if there are no bluetooth packets for 4 minutes, the bluetooth adapter is stuck
+let no_ruuvi_timeout; // if there are no ruuvi packets for 20 minutes, there isn't any ruuvitag around
+let adapter_stuck_timeout; // if there are no bluetooth packets for 25 minutes, the bluetooth adapter is stuck
 let first_ruuvi_packet = true; // boolean to check whether it is the first packet received 
 let socket_already_sent = {};  // now we support a set of ruuvitag in session via socket ...
 let ruuvi_mac_in_session = {}; // ... and here in local: both are maps of (MAC_ADDRESS,boolean)
@@ -64,7 +64,7 @@ function start_exploring() {
   function on_discovery(peripheral) {
 
     clearTimeout(adapter_stuck_timeout);
-    adapter_stuck_timeout = setInterval(recover_adapter, 300000);
+    adapter_stuck_timeout = setInterval(recover_adapter, 1500000);
 
     let encoded_data = peripheral.advertisement.manufacturerData;
 
@@ -76,9 +76,9 @@ function start_exploring() {
     let rssi = peripheral.rssi;
     decoded_data = decode(encoded_data.slice(2), mac);
     
-    // if no ruuvi packets for 5 minutes, there isn't any ruuvi around
+    // if no ruuvi packets for 20 minutes, there isn't any ruuvi around
     clearTimeout(no_ruuvi_timeout);
-    no_ruuvi_timeout = setTimeout(no_ruuvi_around, 300000);
+    no_ruuvi_timeout = setTimeout(no_ruuvi_around, 1200000);
 
     /*
     * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
@@ -139,12 +139,12 @@ function start_exploring() {
       }
     }
 
-    /* if the ruuvi monitored by Flavia is out of range for 3 minutes
+    /* if the ruuvi monitored by Flavia is out of range for 15 minutes
     before the movement counter is set to 0, the end session message is sent */
     if (ruuvi_mac_in_session[ruuvi.mac] === true && socket_already_sent[ruuvi.mac] === true) {
       clearTimeout(end_session_timeout);
       ruuvi_to_end = ruuvi;
-      end_session_timeout = setTimeout(() => { end_session(ruuvi_to_end); }, 180000);
+      end_session_timeout = setTimeout(() => { end_session(ruuvi_to_end); }, 900000);
     }
 
     // write in the database only the packet of the closer device [WIP]
@@ -187,7 +187,7 @@ function start_exploring() {
     ruuvi_mac_in_session[ruuvi.mac] = false;
 
     if (socket_already_sent[ruuvi.mac]) {
-      console.log("Sessione terminata, il ruuvitag in sessione non è nei paraggi da 3 minuti")
+      console.log("Sessione terminata, il ruuvitag in sessione non è nei paraggi da 15 minuti")
       send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
       socket_already_sent[ruuvi.mac] = false;
     }
