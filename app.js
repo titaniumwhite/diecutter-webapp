@@ -15,6 +15,16 @@ const Q = 3;
 
 const client = new net.Socket();
 
+// socket exception handling
+client.on('error', function(err){
+    console.log(err);
+    sleep(10000).then(() => {
+      // Do something after the sleep!
+      connect_to_socket();
+    });
+});
+   
+
 let new_firmware_mac_list = ["da:bc:6e:d4:80:73"];
 
 let temporary_list = [];
@@ -25,11 +35,19 @@ let socket_already_sent = {};  // now we support a set of ruuvitag in session vi
 let ruuvi_mac_in_session = {}; // ... and here in local: both are maps of (MAC_ADDRESS,boolean)
 let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for 3 minutes
                             before the movement counter is set to 0, the end session message is sent */
-/*
-client.connect(2345, '127.0.0.1', function() {
-  console.log("Connected to Python module");
-})
-*/
+
+let is_connected = false; // is python socket connected?
+
+/* wrap the connect function */
+function connect_to_socket(){
+  if(!is_connected){           
+    client.connect(2345, '127.0.0.1', function() {
+      console.log("Connected to Python module");
+    });
+  }
+}
+
+connect_to_socket();
 
 start_exploring();
 
@@ -151,7 +169,7 @@ function start_exploring() {
     if (ruuvi.in_session === true) {
         
       decoded_data["session_id"] = ruuvi.session_id;
-      influx.write(decoded_data);
+      //influx.write(decoded_data);
     }
 
     ruuvi.mov_counter = decoded_data["movement_counter"];
@@ -273,7 +291,7 @@ function start_exploring() {
   
     console.log("INVIATO " + packet);
   
-    //client.write(packet); 
+    client.write(packet); 
   }
 
   function compute_rotations(prev_date, curr_date, speed, previous_rotations){
@@ -377,6 +395,12 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 })
 
+/* sleep util function */
+function sleep (time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
+
 server.listen(port, () => {
   console.log(`Listening at http://localhost:${port}`);
 });
+
