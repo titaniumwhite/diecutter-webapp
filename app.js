@@ -13,19 +13,7 @@ const axios = require('axios');
 const R = 0.01;
 const Q = 3;
 
-const client = new net.Socket();
-
-// socket exception handling
-client.on('error', function(err){
-    is_connected = false;
-    console.log(err);
-    sleep(10000).then(() => {
-      // Do something after the sleep!
-      connect_to_socket();
-    });
-});
-   
-
+// Status Variables
 let new_firmware_mac_list = ["da:bc:6e:d4:80:73"];
 
 let temporary_list = [];
@@ -39,7 +27,21 @@ let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for
 
 let is_connected = false; // is python socket connected?
 
-/* wrap the connect function */
+/* Socket connection */
+const client = new net.Socket();
+
+// socket exception handling
+client.on('error', function(err){
+    is_connected = false;
+    console.log(err);
+    sleep(10000).then(() => {
+      // Do something after the sleep!
+      connect_to_socket();
+    });
+});
+   
+
+/* Wrap the connect function */
 function connect_to_socket(){
   if(!is_connected){           
     client.connect(2345, '127.0.0.1', function() {
