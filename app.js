@@ -148,14 +148,12 @@ function start_exploring() {
     }
 
     // write in the database only the packet of the closer device [WIP]
-    if (ruuvi.rounds !== decoded_data["rounds"] && 
-        ruuvi.in_session === true) {
+    if (ruuvi.in_session === true) {
         
       decoded_data["session_id"] = ruuvi.session_id;
       influx.write(decoded_data);
     }
 
-    ruuvi.rounds = decoded_data["rounds"];
     ruuvi.mov_counter = decoded_data["movement_counter"];
 
   }

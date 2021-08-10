@@ -4,7 +4,6 @@ module.exports= class RuuviTag {
         this._rssi = rssi;
         this._in_session = in_session;
         this._session_id = session_id;
-        this._rounds = rounds;
         this._mov_counter = mov_counter;
         this._kalman = kalman;
 
@@ -20,7 +19,6 @@ module.exports= class RuuviTag {
     get session_id() { return this._session_id; }
     get kalman() { return this._kalman; }
     get mov_counter() { return this._mov_counter; }
-    get rounds() { return this._rounds; }
     get increase_session_id() { return this.increase(); }
 
     // additional getter methods
@@ -30,7 +28,6 @@ module.exports= class RuuviTag {
 
 
     set rssi(rssi) { this._rssi = rssi; }
-    set rounds(rounds) { this._rounds = rounds; }
     set mov_counter(mov_counter) { this._mov_counter = mov_counter; }
     set in_session(in_session) { this._in_session = in_session; }
     set session_id(session_id) { this._session_id = session_id; }
