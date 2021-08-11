@@ -1,9 +1,16 @@
+// Is this a debug version?
+const debug = true;
+// Is this a local test version (non-factory)?
+const local = false;
+
 const express = require('express');
 const app     = express();
 const server  = require('http').createServer(app); 
 const port    = 8000;
 const noble = require('@abandonware/noble');
-const influx = require('./influx');
+if(!local){
+  const influx = require('./influx');
+}
 const RuuviTag = require('./ruuvitag');
 const net = require('net');
 const KalmanFilter = require('kalmanjs');
@@ -24,22 +31,23 @@ let socket_already_sent = {};  // now we support a set of ruuvitag in session vi
 let ruuvi_mac_in_session = {}; // ... and here in local: both are maps of (MAC_ADDRESS,boolean)
 let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for 3 minutes
                             before the movement counter is set to 0, the end session message is sent */
-
 let is_connected = false; // is python socket connected?
+
 
 /* Socket connection */
 const client = new net.Socket();
 
-// socket exception handling
-client.on('error', function(err){
-    is_connected = false;
-    console.log(err);
-    sleep(10000).then(() => {
-      // Do something after the sleep!
-      connect_to_socket();
-    });
-});
-   
+if(!local){
+  connect_to_socket();
+}
+
+start_exploring();
+
+// Per ora credo siano inutili, quando vuole Gabbo le facciamo esplodere
+if(!local){
+  influx.getLastRound(setRounds);
+  influx.getLastSession(setSession);
+}
 
 /* Wrap the connect function */
 function connect_to_socket(){
@@ -51,21 +59,43 @@ function connect_to_socket(){
   }
 }
 
-connect_to_socket();
-
-start_exploring();
-
-influx.getLastRound(setRounds);
-influx.getLastSession(setSession);
-
 function start_exploring() {
   let ruuvi_list = [];
+
+  if(debug){
+    console.log("[DEBUG] Starting explore...");
+
+  }
+
   explore();
 
   function explore() {
     noble.on('stateChange', async function (state) {
       if (state === 'poweredOn') {
-        await noble.startScanningAsync([], true);
+
+        if(debug){
+          console.log("[DEBUG] Waiting for noble async...");
+        }
+
+        try{
+          await noble.startScanningAsync([], true);
+        }catch(e){
+
+          if(debug){
+            console.log(e);
+          }
+
+          console.error(e);
+        }
+      }else if (state === 'resetting'){
+        console.log("Adapter resetting, trying again in a few seconds");
+        sleep(1000);
+      }else if (state === 'unknown'|| state === 'unauthorized'|| state === 'unsupported'){
+        console.log("Adapter in unknown/unauthorized/unsupported state, exiting...");
+        process.exit(1);
+      }else if (state === 'poweredOff'){
+        console.log("Adapter Powered off, exiting...");
+        process.exit(1);
       }
     });
     
@@ -75,12 +105,21 @@ function start_exploring() {
 
     noble.on('scanStop', function() {
       console.log("Scanning stopped.");
-      setTimeout(() => {
-        noble.startScanningAsync();
-      }, 60000)
+      try{
+        setTimeout(() => {
+          noble.startScanningAsync();
+        }, 60000);
+      }catch(e){
+        if(debug){
+          console.log(e);
+        }
+        console.error(e);
+      }
     });
 
     noble.on('discover', on_discovery);
+
+    noble.on('warning', (message) => console.log("[WARNING] "+ message));
   }
 
   function on_discovery(peripheral) {
@@ -173,7 +212,11 @@ function start_exploring() {
     if (ruuvi.in_session === true) {
         
       decoded_data["session_id"] = ruuvi.session_id;
-      //influx.write(decoded_data);
+
+      if(!local){
+        influx.write(decoded_data);
+      }
+
     }
 
     ruuvi.mov_counter = decoded_data["movement_counter"];
@@ -294,8 +337,10 @@ function start_exploring() {
     });
   
     console.log("INVIATO " + packet);
-  
-    client.write(packet); 
+
+    if(!local){
+      client.write(packet); 
+    }
   }
 
   function compute_rotations(prev_date, curr_date, speed, previous_rotations){
@@ -338,7 +383,14 @@ function start_exploring() {
   
   function recover_adapter() {
     console.error("ADAPTER STUCK: cannot receive any bluetooth packet");
-    noble.stopScanningAsync();
+    try{
+      noble.stopScanningAsync();
+    }catch(e){
+      if(debug){
+        console.log(e);
+      }
+      console.error(e);
+    }
   }
   
   function no_ruuvi_around() {
@@ -389,7 +441,23 @@ function setSession(result){
   session_id = result;
 }
 
+/* socket exception handling*/
+client.on('error', function(err){
+  console.log(is_connected);
+  is_connected = false;
+  console.log(err);
+  sleep(10000).then(() => {
+    // Connect back again after the 10s sleep!
+    connect_to_socket();
+  });
+});
+ 
+/* last resort exception handling*/
 process.on('uncaughtException', (err) => {
+  if(debug){
+    console.log('[DEBUG] Eccezione lanciata: '+err);
+    console.log('[DEBUG] Vedere i log per più info');
+  }
   console.error('Uncaught exception ', err.message);
   if (err.message == 'LIBUSB_TRANSFER_STALL' || err.message == 'No compatible USB Bluetooth 4.0 device found!') {
     console.error("ERRORE: l'adattatore usb bluetooth è stato rimosso. Riconnetterlo e riavviare manualmente l'applicazione.");
@@ -399,7 +467,13 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 })
 
-/* sleep util function */
+/* maybe unhandled promises detector will help debugging? */
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Application specific logging, throwing an error, or other logic here
+});
+
+/* sleep utility function */
 function sleep (time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
@@ -407,4 +481,3 @@ function sleep (time) {
 server.listen(port, () => {
   console.log(`Listening at http://localhost:${port}`);
 });
-
