@@ -31,6 +31,9 @@ let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for
                             before the movement counter is set to 0, the end session message is sent */
 let is_connected = false; // is python socket connected?
 
+/*
+* Commento da Marco: ma in che lingua scriviamo? Ahahahah
+*/
 
 /* Socket connection */
 const client = new net.Socket();
@@ -62,7 +65,6 @@ function start_exploring() {
 
   if(debug){
     console.log("[DEBUG] Starting explore...");
-
   }
 
   explore();
@@ -80,6 +82,7 @@ function start_exploring() {
         }catch(e){
 
           if(debug){
+            console.log("[ERRORE] Errore nello startScanningAsync");
             console.log(e);
           }
 
@@ -109,6 +112,7 @@ function start_exploring() {
         }, 60000);
       }catch(e){
         if(debug){
+          console.log("[ERRORE] Errore nello StartScanningAsync dopo il timeout");
           console.log(e);
         }
         console.error(e);
@@ -212,7 +216,17 @@ function start_exploring() {
       decoded_data["session_id"] = ruuvi.session_id;
 
       if(!local){
-        influx.write(decoded_data);
+        try{
+          influx.write(decoded_data);
+        }catch(e){
+
+          if(debug){
+            console.log("[ERRORE] Errore nello scrivere su Influx");
+            console.log(e);
+          }
+          console.error(e);
+
+        }
       }
 
     }
@@ -337,7 +351,21 @@ function start_exploring() {
     console.log("[INFO] INVIATO " + packet);
 
     if(!local){
-      client.write(packet); 
+      if(is_connected){
+        try{
+          client.write(packet);
+        }catch(e){
+
+          if(debug){
+            console.log("[ERRORE] Errore nell'invio pacchetti con socket");
+            console.log(e);
+          }
+
+          console.error(e);
+        } 
+      }else{]
+        console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
+      }
     }
   }
 
@@ -380,11 +408,12 @@ function start_exploring() {
   }
   
   function recover_adapter() {
-    console.error("ADAPTER STUCK: cannot receive any bluetooth packet");
+    console.error("[WARN] ADAPTER STUCK: cannot receive any bluetooth packet");
     try{
       noble.stopScanningAsync();
     }catch(e){
       if(debug){
+        console.log("[ERRORE] Errore nello stopScanningAsync");
         console.log(e);
       }
       console.error(e);
@@ -392,7 +421,7 @@ function start_exploring() {
   }
   
   function no_ruuvi_around() {
-    console.log("No RuuviTag around.");
+    console.log("[INFO] No RuuviTag around.");
     clearInterval(no_ruuvi_timeout);
     first_ruuvi_packet = true;
   }
@@ -441,41 +470,50 @@ function setSession(result){
 
 /* socket exception handling*/
 client.on('error', function(err){
-  console.log(is_connected);
+
   is_connected = false;
+  if(debug){
+    console.log("[ERRORE] Errore Client")
+  }
   console.log(err);
-  sleep(10000).then(() => {
-    // Connect back again after the 10s sleep!
+  sleep(20000).then(() => {
+    // Connect back again after the 20s sleep!
+    if(debug){
+      console.log("[DEBUG] Provo a connettermi di nuovo")
+    }
     connect_to_socket();
   });
 });
  
+/* sleep utility function */
+function sleep (time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
+
+/* maybe unhandled promises detector will help debugging? */
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('[WARN] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 /* last resort exception handling*/
 process.on('uncaughtException', (err) => {
   if(debug){
     console.log('[DEBUG] Eccezione lanciata: '+err);
     console.log('[DEBUG] Vedere i log per più info');
   }
-  console.error('Uncaught exception ', err.message);
+  
   if (err.message == 'LIBUSB_TRANSFER_STALL' || err.message == 'No compatible USB Bluetooth 4.0 device found!') {
-    console.error("ERRORE: l'adattatore usb bluetooth è stato rimosso. Riconnetterlo e riavviare manualmente l'applicazione.");
+    console.error("[ERRORE] l'adattatore usb bluetooth è stato rimosso. Riconnetterlo e riavviare manualmente l'applicazione.");
+  }else if(err.message == 'LIBUSB_ERROR_NOT_SUPPORTED'){
+    console.error("[ERRORE] driver USB non installati correttamente/nessun adattatore bt inserito");
+  }else{
+    console.error('[ERROR] Uncaught exception ', err.message);
   }
 
   // exit the process after having shown the error message
   process.exit(1);
 })
 
-/* maybe unhandled promises detector will help debugging? */
-process.on('unhandledRejection', (reason, promise) => {
-  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Application specific logging, throwing an error, or other logic here
-});
-
-/* sleep utility function */
-function sleep (time) {
-  return new Promise((resolve) => setTimeout(resolve, time));
-}
-
 server.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}`);
+  console.log(`[INFO] Listening at http://localhost:${port}`);
 });
