@@ -8,9 +8,7 @@ const app     = express();
 const server  = require('http').createServer(app); 
 const port    = 8000;
 const noble = require('@abandonware/noble');
-if(!local){
-  const influx = require('./influx');
-}
+const influx = require('./influx');
 const RuuviTag = require('./ruuvitag');
 const net = require('net');
 const KalmanFilter = require('kalmanjs');
@@ -53,7 +51,7 @@ if(!local){
 function connect_to_socket(){
   if(!is_connected){           
     client.connect(2345, '127.0.0.1', function() {
-      console.log("Connected to Python module");
+      console.log("[INFO] Connected to Python module");
       is_connected = true;
     });
   }
@@ -88,23 +86,23 @@ function start_exploring() {
           console.error(e);
         }
       }else if (state === 'resetting'){
-        console.log("Adapter resetting, trying again in a few seconds");
+        console.log("[WARN] Adapter resetting, trying again in a few seconds");
         sleep(1000);
       }else if (state === 'unknown'|| state === 'unauthorized'|| state === 'unsupported'){
-        console.log("Adapter in unknown/unauthorized/unsupported state, exiting...");
+        console.log("[ERROR] Adapter in unknown/unauthorized/unsupported state, exiting...");
         process.exit(1);
       }else if (state === 'poweredOff'){
-        console.log("Adapter Powered off, exiting...");
+        console.log("[WARN] Adapter Powered off, exiting...");
         process.exit(1);
       }
     });
     
     noble.on('scanStart', function() {
-      console.log("Scanning started.");
+      console.log("[INFO] Scanning started.");
     });
 
     noble.on('scanStop', function() {
-      console.log("Scanning stopped.");
+      console.log("[INFO] Scanning stopped.");
       try{
         setTimeout(() => {
           noble.startScanningAsync();
@@ -186,7 +184,7 @@ function start_exploring() {
         ruuvi_mac_in_session[ruuvi.mac] = true;
         socket_already_sent[ruuvi.mac] = true;
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
-        console.log("Sessione iniziata per "+ ruuvi.mac)
+        console.log("[INFO] Sessione iniziata per "+ ruuvi.mac)
       }
 
     } else if (!ruuvi.in_session && ruuvi_mac_in_session[ruuvi.mac] !== undefined 
@@ -196,7 +194,7 @@ function start_exploring() {
         ruuvi_mac_in_session[ruuvi.mac] = false;
         socket_already_sent[ruuvi.mac] = false;
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
-        console.log("Sessione terminata per "+ ruuvi.mac)
+        console.log("[INFO] Sessione terminata per "+ ruuvi.mac)
       }
     }
 
@@ -336,7 +334,7 @@ function start_exploring() {
       in_session : in_session
     });
   
-    console.log("INVIATO " + packet);
+    console.log("[INFO] INVIATO " + packet);
 
     if(!local){
       client.write(packet); 
