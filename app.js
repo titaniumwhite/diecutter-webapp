@@ -363,7 +363,7 @@ function start_exploring() {
 
           console.error(e);
         } 
-      }else{]
+      }else{
         console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
       }
     }
