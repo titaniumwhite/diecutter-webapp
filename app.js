@@ -12,7 +12,6 @@ const influx = require('./influx');
 const RuuviTag = require('./ruuvitag');
 const net = require('net');
 const KalmanFilter = require('kalmanjs');
-const axios = require('axios');
 
 // Kalman Settings
 const R = 0.01;
@@ -56,6 +55,12 @@ function connect_to_socket(){
     client.connect(2345, '127.0.0.1', function() {
       console.log("[INFO] Connected to Python module");
       is_connected = true;
+      /* Each time python module connects, send to it all the Ruuvi in list */
+      for (let i = 0; i < ruuvi_list.length; i++) {
+        if (ruuvi_list[i].in_session) {
+          send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
+        };
+      }
     });
   }
 }
@@ -234,31 +239,7 @@ function start_exploring() {
     ruuvi.mov_counter = decoded_data["movement_counter"];
 
   }
-/*
-  function get_session_id(mac) {
-    let token;
-    let last_session_id;
-    axios.post('https://foiadev.diag.uniroma1.it:5002/v1/login', {
-      username : '123', 
-      password : 'ciao'
-    }).then(res => {
-      token = res;
-    }).catch(error => {
-      console.log(error);
-    })
 
-    axios.get('https://foiadev.diag.uniroma1.it:5002/v1/diecutters/' + mac + '/lastcycle', {
-      headers: {
-        'key' : token
-      }
-    }).then(res => {
-      last_session_id = res;
-    })
-
-    return last_session_id;
-  }
-*/
-  
   function end_session(ruuvi) {
     ruuvi.in_session = false;
     ruuvi_mac_in_session[ruuvi.mac] = false;
@@ -476,8 +457,8 @@ client.on('error', function(err){
     console.log("[ERRORE] Errore Client")
   }
   console.log(err);
-  sleep(20000).then(() => {
-    // Connect back again after the 20s sleep!
+  sleep(5000).then(() => {
+    // Connect back again after the 5s sleep!
     if(debug){
       console.log("[DEBUG] Provo a connettermi di nuovo")
     }
