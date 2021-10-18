@@ -152,7 +152,7 @@ function start_exploring() {
     * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
     * Otherwise, create a new ruuvi and put it in the list.
     */
-    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data);
+    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["movement_counter"]);
 
     console.log(`mac: ${mac}`);
     console.log(`rounds: ${decoded_data["rounds"]}`);
@@ -282,7 +282,7 @@ function start_exploring() {
     return ruuvi;
   }
    
-  function update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data) {
+  function update_or_create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter){
 
     for (let i = 0; i < ruuvi_list.length; i++) {
       
@@ -291,35 +291,11 @@ function start_exploring() {
         let selected_ruuvi = ruuvi_list[i];
         selected_ruuvi.rssi = selected_ruuvi.kalman.filter(rssi);
         
-        let current_rotations = decoded_data["rounds"];
-        let current_raw_session = decoded_data["movement_counter"];
-        let current_timestamp = new Date();
-
-        if (current_raw_session > 0 && 
-            current_raw_session === selected_ruuvi.prev_raw_session){
-          // recompute "current_rotations" variable and
-          // update "rounds" field in "decoded_data" object
-          
-          let current_speed = decoded_data["speed"];
-
-          current_rotations = compute_rotations(selected_ruuvi.prev_timestamp,
-                                                current_timestamp,
-                                                current_speed, 
-                                                selected_ruuvi.prev_rotations);
-
-          decoded_data["rounds"] = current_rotations;
-        }
-
-        // update prev variables
-        selected_ruuvi.prev_raw_session = current_raw_session;
-        selected_ruuvi.prev_rotations = current_rotations;
-        selected_ruuvi.prev_timestamp = current_timestamp;
-        
         return selected_ruuvi;
       };
     }
 
-    return create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["mov_counter"]);
+    return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
   }
 
   function send_to_socket(socket_current_mac, session_id, in_session) {
@@ -348,14 +324,6 @@ function start_exploring() {
         console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
       }
     }
-  }
-
-  function compute_rotations(prev_date, curr_date, speed, previous_rotations){
-    let time_diff = (curr_date - prev_date)/1000;
-    let new_rotations = time_diff * speed;
-    let total_rotations = Math.round(previous_rotations + new_rotations);
-    
-    return total_rotations;
   }
   
   function decode(data, mac) {
