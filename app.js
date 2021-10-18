@@ -17,9 +17,6 @@ const KalmanFilter = require('kalmanjs');
 const R = 0.01;
 const Q = 3;
 
-// Status Variables
-let new_firmware_mac_list = ["da:bc:6e:d4:80:73"];
-
 let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 20 minutes, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 25 minutes, the bluetooth adapter is stuck
@@ -158,16 +155,13 @@ function start_exploring() {
     console.log(`rounds: ${decoded_data["rounds"]}`);
     console.log(`mov_counter: ${decoded_data["movement_counter"]}`);
 
-    if (new_firmware_mac_list.includes(mac)) {
-      console.log("printing additional debug info:");
-      console.log(`time: ${(new Date()).toLocaleString()}`);
-      console.log(`original speed: ${decoded_data["original_speed"]}`);
-      console.log(`computed_speed: ${decoded_data["speed"]}`);
-      console.log(`input data std: ${decoded_data["input_data_std"]}`);
-      console.log(`max power: ${decoded_data["max_power"]}`);
-      console.log(`freq std: ${decoded_data["freq_std"]}`); 
-    
-    }
+    console.log("printing additional debug info:");
+    console.log(`time: ${(new Date()).toLocaleString()}`);
+    console.log(`true speed: ${decoded_data["original_speed"]}`);
+    console.log(`computed_speed: ${decoded_data["speed"]}`);
+    console.log(`input data std: ${decoded_data["input_data_std"]}`);
+    console.log(`max power: ${decoded_data["max_power"]}`);
+    console.log(`freq std: ${decoded_data["freq_std"]}`); 
 
     console.log(""); 
 
@@ -338,16 +332,11 @@ function start_exploring() {
     ble_packet["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
 
     // parse debug data
-    if (new_firmware_mac_list.includes(mac)) {
-      
-      ble_packet["new_session_id"] = data.slice(7,9).readInt16BE();
-      ble_packet["original_speed"] = data.slice(9,11).readInt16BE() / 1000;
-      ble_packet["input_data_std"] = data.slice(11,13).readInt16BE() / 1000;
-      ble_packet["max_power"] = data.slice(13,15).readInt16BE();
-      ble_packet["freq_std"] = data.slice(16,18).readUInt16BE() / 1000;
-    }
-  
-    ble_packet["movement_counter"] = data.slice(15,16).readUInt8();
+    ble_packet["movement_counter"] = data.slice(7,9).readInt16BE();
+    ble_packet["original_speed"] = data.slice(9,11).readInt16BE() / 1000;
+    ble_packet["input_data_std"] = data.slice(11,13).readInt16BE() / 1000;
+    ble_packet["max_power"] = data.slice(13,15).readInt16BE();
+    ble_packet["freq_std"] = data.slice(16,18).readUInt16BE() / 1000;
 
     // parse rotation related data
     ble_packet["speed"] = data.slice(5, 7).readUInt16BE() / 1000;
