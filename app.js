@@ -29,6 +29,7 @@ let ruuvi_mac_in_session = {}; // ... and here in local: both are maps of (MAC_A
 let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for 3 minutes
                             before the movement counter is set to 0, the end session message is sent */
 let is_connected = false; // is python socket connected?
+let ruuvi_list = [];
 
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
@@ -66,7 +67,6 @@ function connect_to_socket(){
 }
 
 function start_exploring() {
-  let ruuvi_list = [];
 
   if(debug){
     console.log("[DEBUG] Starting explore...");
