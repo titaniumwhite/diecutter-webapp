@@ -50,6 +50,34 @@ if(!local){
   influx.getLastSession(setSession);
 }
 
+function send_to_socket(socket_current_mac, session_id, in_session) {
+  let packet = JSON.stringify({
+    diecutter_id : socket_current_mac,
+    session_id : session_id,
+    in_session : in_session
+  });
+
+  console.log("[INFO] INVIATO " + packet);
+
+  if(!local){
+    if(is_connected){
+      try{
+        client.write(packet);
+      }catch(e){
+
+        if(debug){
+          console.log("[ERRORE] Errore nell'invio pacchetti con socket");
+          console.log(e);
+        }
+
+        console.error(e);
+      } 
+    }else{
+      console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
+    }
+  }
+}
+
 /* Wrap the connect function */
 function connect_to_socket(){
   if(!is_connected){           
@@ -322,33 +350,6 @@ function start_exploring() {
     return create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["mov_counter"]);
   }
 
-  function send_to_socket(socket_current_mac, session_id, in_session) {
-    let packet = JSON.stringify({
-      diecutter_id : socket_current_mac,
-      session_id : session_id,
-      in_session : in_session
-    });
-  
-    console.log("[INFO] INVIATO " + packet);
-
-    if(!local){
-      if(is_connected){
-        try{
-          client.write(packet);
-        }catch(e){
-
-          if(debug){
-            console.log("[ERRORE] Errore nell'invio pacchetti con socket");
-            console.log(e);
-          }
-
-          console.error(e);
-        } 
-      }else{
-        console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
-      }
-    }
-  }
 
   function compute_rotations(prev_date, curr_date, speed, previous_rotations){
     let time_diff = (curr_date - prev_date)/1000;
