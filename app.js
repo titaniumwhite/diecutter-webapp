@@ -34,10 +34,6 @@ let is_connected = false; // is python socket connected?
 /* Socket connection */
 const client = new net.Socket();
 
-if(!local){
-  connect_to_socket();
-}
-
 start_exploring();
 
 // Per ora credo siano inutili, quando vuole Gabbo le facciamo esplodere
@@ -46,24 +42,12 @@ if(!local){
   influx.getLastSession(setSession);
 }
 
-/* Wrap the connect function */
-function connect_to_socket(){
-  if(!is_connected){           
-    client.connect(2345, '127.0.0.1', function() {
-      console.log("[INFO] Connected to Python module");
-      is_connected = true;
-      /* Each time python module connects, send to it all the Ruuvi in list */
-      for (let i = 0; i < ruuvi_list.length; i++) {
-        if (ruuvi_list[i].in_session) {
-          send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
-        };
-      }
-    });
-  }
-}
-
 function start_exploring() {
   let ruuvi_list = [];
+  
+  if(!local){
+    connect_to_socket();
+  }
 
   if(debug){
     console.log("[DEBUG] Starting explore...");
@@ -96,10 +80,10 @@ function start_exploring() {
       }else if (state === 'unknown'|| state === 'unauthorized'|| state === 'unsupported'){
         console.log("[ERROR] Adapter in unknown/unauthorized/unsupported state, exiting...");
         process.exit(1);
-      }else if (state === 'poweredOff'){
+      } /* else if (state === 'poweredOff'){
         console.log("[WARN] Adapter Powered off, exiting...");
         process.exit(1);
-      }
+      } */
     });
     
     noble.on('scanStart', function() {
@@ -292,6 +276,23 @@ function start_exploring() {
     return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
   }
 
+  /* Wrap the connect function */
+  function connect_to_socket(){
+    if(!is_connected){           
+      client.connect(2345, '127.0.0.1', function() {
+        is_connected = true;
+        /* Each time python module connects, send to it all the Ruuvi in list */
+        console.log("[INFO] Modulo Python connesso, invio i pacchetti in sessione " + packet);
+        for (let i = 0; i < ruuvi_list.length; i++) {
+          if (ruuvi_list[i].in_session && socket_already_sent[ruuvi_list[i].mac] === false) {
+            send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
+            socket_already_sent[ruuvi_list[i].mac] = true
+          };
+        }
+      });
+    }
+  }
+
   function send_to_socket(socket_current_mac, session_id, in_session) {
     let packet = JSON.stringify({
       diecutter_id : socket_current_mac,
@@ -318,6 +319,34 @@ function start_exploring() {
         console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
       }
     }
+  }
+
+  /* socket exception handling*/
+  client.on('error', function(err){
+    is_connected = false;
+    if(debug){
+      console.log("[ERRORE] Errore Client")
+    }
+    console.log(err);
+
+    for (let i = 0; i < ruuvi_list.length; i++) {
+      if (ruuvi_list[i].mac in socket_already_sent && socket_already_sent[ruuvi_list[i].mac] === true) {
+        socket_already_sent[ruuvi_list[i].mac] === false;
+      }
+    }
+
+    sleep(20000).then(() => {
+      // Connect back again after the 20s sleep!
+      if(debug){
+        console.log("[DEBUG] Provo a connettermi di nuovo")
+      }
+      connect_to_socket();
+    });
+  });
+  
+  /* sleep utility function */
+  function sleep (time) {
+    return new Promise((resolve) => setTimeout(resolve, time));
   }
   
   function decode(data, mac) {
@@ -404,28 +433,6 @@ function setRounds(result){
 
 function setSession(result){
   session_id = result;
-}
-
-/* socket exception handling*/
-client.on('error', function(err){
-
-  is_connected = false;
-  if(debug){
-    console.log("[ERRORE] Errore Client")
-  }
-  console.log(err);
-  sleep(5000).then(() => {
-    // Connect back again after the 5s sleep!
-    if(debug){
-      console.log("[DEBUG] Provo a connettermi di nuovo")
-    }
-    connect_to_socket();
-  });
-});
- 
-/* sleep utility function */
-function sleep (time) {
-  return new Promise((resolve) => setTimeout(resolve, time));
 }
 
 /* maybe unhandled promises detector will help debugging? */
