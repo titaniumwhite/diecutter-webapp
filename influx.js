@@ -39,8 +39,8 @@ function write(data) {
     });
 }
 
-function getLastSession(callback) {
-  influx.query('select last(session_id) from ruuvi order by desc limit 1').catch(err=>{
+function getLastSession(callback,mac) {
+  influx.query('select last(session_id) from ruuvi where mac =' + mac +' order by desc limit 1').catch(err=>{
       console.log(err);
     })
     .then(results=>{
