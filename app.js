@@ -39,7 +39,7 @@ start_exploring();
 // Per ora credo siano inutili, quando vuole Gabbo le facciamo esplodere
 if(!local){
   influx.getLastRound(setRounds);
-  influx.getLastSession(setSession);
+  influx.getLastSession(setSession,"");
 }
 
 function start_exploring() {
