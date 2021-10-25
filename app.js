@@ -370,7 +370,7 @@ client.on('error', function(err){
 
   for (let i = 0; i < ruuvi_list.length; i++) {
     if (ruuvi_list[i].mac in socket_already_sent && socket_already_sent[ruuvi_list[i].mac] === true) {
-      socket_already_sent[ruuvi_list[i].mac] === false;
+      socket_already_sent[ruuvi_list[i].mac] = false;
     }
   }
 
