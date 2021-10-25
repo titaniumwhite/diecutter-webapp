@@ -26,7 +26,7 @@ let ruuvi_mac_in_session = {}; // ... and here in local: both are maps of (MAC_A
 let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for 3 minutes
                             before the movement counter is set to 0, the end session message is sent */
 let is_connected = false; // is python socket connected?
-
+let ruuvi_list = [];
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
 */
@@ -43,7 +43,7 @@ if(!local){
 }
 
 function start_exploring() {
-  let ruuvi_list = [];
+
   
   if(!local){
     connect_to_socket();
@@ -112,6 +112,7 @@ function start_exploring() {
 
   function on_discovery(peripheral) {
 
+
     clearTimeout(adapter_stuck_timeout);
     adapter_stuck_timeout = setInterval(recover_adapter, 1500000);
 
@@ -123,7 +124,7 @@ function start_exploring() {
     let ruuvi;
     let mac = peripheral.address;
     let rssi = peripheral.rssi;
-    decoded_data = decode(encoded_data.slice(2), mac);
+    let decoded_data = decode(encoded_data.slice(2), mac);
     
     // if no ruuvi packets for 20 minutes, there isn't any ruuvi around
     clearTimeout(no_ruuvi_timeout);
@@ -178,8 +179,12 @@ function start_exploring() {
       && ruuvi_mac_in_session[ruuvi.mac] === true) {
 
       if (socket_already_sent[ruuvi.mac] === true) {
+        // write on Influx the ruuvi is not in session anymore
+        decoded_data["in_session"] = ruuvi.in_session;
+        if(!local) influx.write(decoded_data);
+
         ruuvi_mac_in_session[ruuvi.mac] = false;
-        socket_already_sent[ruuvi.mac] = false;
+        socket_already_sent[ruuvi.mac] = false;      
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
         console.log("[INFO] Sessione terminata per "+ ruuvi.mac)
       }
@@ -197,6 +202,7 @@ function start_exploring() {
     if (ruuvi.in_session === true) {
         
       decoded_data["session_id"] = ruuvi.session_id;
+      decoded_data["in_session"] = ruuvi.in_session;
 
       if(!local){
         try{
@@ -275,79 +281,6 @@ function start_exploring() {
 
     return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
   }
-
-  /* Wrap the connect function */
-  function connect_to_socket(){
-    if(!is_connected){           
-      client.connect(2345, '127.0.0.1', function() {
-        is_connected = true;
-        /* Each time python module connects, send to it all the Ruuvi in list */
-        console.log("[INFO] Modulo Python connesso, invio i pacchetti in sessione " + packet);
-        for (let i = 0; i < ruuvi_list.length; i++) {
-          if (ruuvi_list[i].in_session && socket_already_sent[ruuvi_list[i].mac] === false) {
-            send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
-            socket_already_sent[ruuvi_list[i].mac] = true
-          };
-        }
-      });
-    }
-  }
-
-  function send_to_socket(socket_current_mac, session_id, in_session) {
-    let packet = JSON.stringify({
-      diecutter_id : socket_current_mac,
-      session_id : session_id,
-      in_session : in_session
-    });
-  
-    console.log("[INFO] INVIATO " + packet);
-
-    if(!local){
-      if(is_connected){
-        try{
-          client.write(packet);
-        }catch(e){
-
-          if(debug){
-            console.log("[ERRORE] Errore nell'invio pacchetti con socket");
-            console.log(e);
-          }
-
-          console.error(e);
-        } 
-      }else{
-        console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
-      }
-    }
-  }
-
-  /* socket exception handling*/
-  client.on('error', function(err){
-    is_connected = false;
-    if(debug){
-      console.log("[ERRORE] Errore Client")
-    }
-    console.log(err);
-
-    for (let i = 0; i < ruuvi_list.length; i++) {
-      if (ruuvi_list[i].mac in socket_already_sent && socket_already_sent[ruuvi_list[i].mac] === true) {
-        socket_already_sent[ruuvi_list[i].mac] === false;
-      }
-    }
-
-    sleep(20000).then(() => {
-      // Connect back again after the 20s sleep!
-      if(debug){
-        console.log("[DEBUG] Provo a connettermi di nuovo")
-      }
-      connect_to_socket();
-    });
-  });
-  
-  /* sleep utility function */
-  function sleep (time) {
-    return new Promise((resolve) => setTimeout(resolve, time));
-  }
   
   function decode(data, mac) {
     
@@ -425,6 +358,86 @@ function start_exploring() {
     temporary_list = [];
   }
 
+}
+
+/* socket exception handling*/
+client.on('error', function(err){
+  is_connected = false;
+  if(debug){
+    console.log("[ERRORE] Errore Client")
+  }
+  console.log(err);
+
+  for (let i = 0; i < ruuvi_list.length; i++) {
+    if (ruuvi_list[i].mac in socket_already_sent && socket_already_sent[ruuvi_list[i].mac] === true) {
+      socket_already_sent[ruuvi_list[i].mac] === false;
+    }
+  }
+
+});
+
+client.on('close', function(err) {
+  sleep(10000).then(() => {
+    // Connect back again after the 10s sleep!
+    if(debug){
+      console.log("[DEBUG] Provo a connettermi di nuovo")
+    }
+    connect_to_socket();
+  });
+})
+
+client.on('connect', function() {
+  is_connected = true;
+  /* Each time python module connects, send to it all the Ruuvi in list */
+  console.log("[INFO] Modulo Python connesso, invio i Ruuvi in sessione ");
+  for (let i = 0; i < ruuvi_list.length; i++) {
+    if (ruuvi_list[i].in_session && socket_already_sent[ruuvi_list[i].mac] === false) {
+      send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
+      socket_already_sent[ruuvi_list[i].mac] = true
+    };
+  }
+})
+
+/* Wrap the connect function */
+function connect_to_socket(){
+  if(!is_connected){           
+    client.connect(2345, '127.0.0.1');
+  }
+}
+
+function send_to_socket(socket_current_mac, session_id, in_session) {
+  let packet = JSON.stringify({
+    diecutter_id : socket_current_mac,
+    session_id : session_id,
+    in_session : in_session
+  });
+
+  console.log("[INFO] INVIATO " + packet);
+
+  if(!local){
+    if(is_connected){
+      try{
+        client.write(packet);
+      }catch(e){
+
+        if(debug){
+          console.log("[ERRORE] Errore nell'invio pacchetti con socket");
+          console.log(e);
+        }
+
+        console.error(e);
+      } 
+    }else{
+      console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
+    }
+  }
+}
+
+
+
+/* sleep utility function */
+function sleep (time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
 }
 
 function setRounds(result){

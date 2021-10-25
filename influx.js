@@ -10,6 +10,7 @@ const influx = new Influx.InfluxDB({
           mac: Influx.FieldType.STRING,
           rounds: Influx.FieldType.INTEGER,
           session_id: Influx.FieldType.INTEGER,
+          in_session: Influx.FieldType.BOOLEAN,
           temperature: Influx.FieldType.INTEGER,
           humidity: Influx.FieldType.INTEGER,
           speed: Influx.FieldType.FLOAT
@@ -29,6 +30,7 @@ function write(data) {
               mac: data['mac'],
               rounds: data['rounds'],
               session_id: data['session_id'],
+              in_session: data['in_session'],
               temperature: data['temperature'],
               humidity: data['humidity'],
               speed: data['speed']
