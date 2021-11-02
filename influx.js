@@ -42,14 +42,14 @@ function write(data) {
 }
 
 function getLastSession(callback,mac) {
-  influx.query('select last(session_id) from ruuvi where mac =' + mac +' order by desc limit 1').catch(err=>{
+  influx.query('select last(session_id) from ruuvi where mac =\'' + mac + '\'').catch(err=>{
       console.log(err);
     })
     .then(results=>{
       if(results.length > 0)
-        callback(results[0].last);
+        callback(results[0].last,mac);
       else
-        callback(0);
+        callback(-2,mac);
     });
 }
 

@@ -27,6 +27,11 @@ let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for
                             before the movement counter is set to 0, the end session message is sent */
 let is_connected = false; // is python socket connected?
 let ruuvi_list = [];
+
+
+let mac_address_list = ["da:5b:93:12:58:30","ee:ea:4b:24:65:33","c7:02:8f:47:f2:0d","d5:65:e4:a8:89:60", 
+                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73"]
+let last_session_map = {}
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
 */
@@ -39,7 +44,10 @@ start_exploring();
 // Per ora credo siano inutili, quando vuole Gabbo le facciamo esplodere
 if(!local){
   influx.getLastRound(setRounds);
-  influx.getLastSession(setSession,"");
+  for(mac in mac_address_list){
+    console.log(mac_address_list[mac])
+    influx.getLastSession(setSession,mac_address_list[mac]);
+  }
 }
 
 function start_exploring() {
@@ -158,6 +166,7 @@ function start_exploring() {
     ) {
       if (ruuvi.in_session === false) {
         ruuvi.increase_session_id;
+        last_session_map[ruuvi.mac] = last_session_map[ruuvi.mac] + 1
         ruuvi.in_session = true;
       }
     }
@@ -261,7 +270,8 @@ function start_exploring() {
   
   function create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter) {
     let kf = new KalmanFilter({R: R, Q: Q});
-    let ruuvi = new RuuviTag(mac, rssi, false, 0, 0, mov_counter, kf);
+    let ruuvi = new RuuviTag(mac, rssi, false, last_session_map[mac], 0, mov_counter, kf);
+    console.log("Created Ruuuvi "+mac+" with sid = "+last_session_map[mac])
     ruuvi_list.push(ruuvi);
     return ruuvi;
   }
@@ -444,8 +454,9 @@ function setRounds(result){
   last_round_value = result;
 }
 
-function setSession(result){
-  session_id = result;
+function setSession(result,mac){
+  console.log(mac +" "+result)
+  last_session_map[mac] = result + 1;
 }
 
 /* maybe unhandled promises detector will help debugging? */
