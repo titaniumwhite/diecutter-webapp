@@ -49,7 +49,57 @@ function getLastSession(callback,mac) {
       if(results.length > 0)
         callback(results[0].last,mac);
       else
-        callback(-2,mac);
+        callback(-1,mac);
+    });
+}
+
+
+function fixIncompleteSessions(mac) {
+  influx.query('select last(in_session) from ruuvi where mac =\'' + mac + '\'').catch(err=>{
+      console.log(err);
+    })
+    .then(results=>{
+      
+      if(results.length > 0){
+        if(results[0].last == 'true'){
+          console.log("[WARNING] "+mac+" has NOT correctly finished the session")
+          influx.writePoints([
+              {
+                  measurement: 'ruuvi',
+                  fields: { 
+                    mac: mac,
+                    rounds: 0,
+                    in_session: false,
+                    temperature: 0.0,
+                    humidity: 0,
+                    speed: 0
+                  }
+              }
+          ], {
+              database: 'rotalaser'
+          });
+        }else{
+          console.log("[INFO] "+mac+" has correctly finished the session")
+        }
+        
+      }
+      else
+        console.log("[WARNING] Unable to find last in_session for " + mac)
+         influx.writePoints([
+              {
+                  measurement: 'ruuvi',
+                  fields: { 
+                    mac: mac,
+                    rounds: 0,
+                    in_session: false,
+                    temperature: 0.0,
+                    humidity: 0,
+                    speed: 0
+                  }
+              }
+          ], {
+              database: 'rotalaser'
+          });
     });
 }
 
@@ -68,5 +118,6 @@ function getLastRound(callback) {
 module.exports = {
   write,
   getLastSession,
-  getLastRound
+  getLastRound,
+  fixIncompleteSessions
 }

@@ -45,8 +45,8 @@ start_exploring();
 if(!local){
   influx.getLastRound(setRounds);
   for(mac in mac_address_list){
-    console.log(mac_address_list[mac])
     influx.getLastSession(setSession,mac_address_list[mac]);
+    influx.fixIncompleteSessions(mac_address_list[mac])
   }
 }
 
@@ -455,7 +455,7 @@ function setRounds(result){
 }
 
 function setSession(result,mac){
-  console.log(mac +" "+result)
+  console.log("[INFO] "+mac+" last session_id: "+result)
   last_session_map[mac] = result + 1;
 }
 
