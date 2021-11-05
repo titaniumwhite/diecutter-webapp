@@ -456,7 +456,7 @@ function setRounds(result){
 
 function setSession(result,mac){
   console.log("[INFO] "+mac+" last session_id: "+result)
-  last_session_map[mac] = result + 1;
+  last_session_map[mac] = result;
 }
 
 /* maybe unhandled promises detector will help debugging? */
