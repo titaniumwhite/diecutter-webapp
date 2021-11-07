@@ -55,24 +55,25 @@ function getLastSession(callback,mac) {
 
 
 function fixIncompleteSessions(mac) {
-  influx.query('select last(in_session) from ruuvi where mac =\'' + mac + '\'').catch(err=>{
+  influx.query('select * from ruuvi where mac =\'' + mac + '\' order by time desc limit 1').catch(err=>{
       console.log(err);
     })
     .then(results=>{
       
       if(results.length > 0){
-        if(results[0].last == 'true'){
+        if(results[0].in_session == 'true'){
           console.log("[WARNING] "+mac+" has NOT correctly finished the session")
           influx.writePoints([
               {
                   measurement: 'ruuvi',
-                  fields: { 
+                  time: results[0].time,
+                  fields: {   
                     mac: mac,
-                    rounds: 0,
+                    rounds: results[0].rounds,
                     in_session: false,
-                    temperature: 0.0,
-                    humidity: 0,
-                    speed: 0
+                    temperature: results[0].temperature,
+                    humidity: results[0].humidity,
+                    speed: results[0].speed
                   }
               }
           ], {
