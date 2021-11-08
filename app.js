@@ -17,9 +17,6 @@ const KalmanFilter = require('kalmanjs');
 const R = 0.01;
 const Q = 3;
 
-// Status Variables
-let new_firmware_mac_list = ["da:bc:6e:d4:80:73"];
-
 let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 20 minutes, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 25 minutes, the bluetooth adapter is stuck
@@ -31,6 +28,10 @@ let end_session_timeout; /* if the ruuvi monitored by Flavia is out of range for
 let is_connected = false; // is python socket connected?
 let ruuvi_list = [];
 
+
+let mac_address_list = ["da:5b:93:12:58:30","ee:ea:4b:24:65:33","c7:02:8f:47:f2:0d","d5:65:e4:a8:89:60", 
+                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73"]
+let last_session_map = {}
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
 */
@@ -38,63 +39,23 @@ let ruuvi_list = [];
 /* Socket connection */
 const client = new net.Socket();
 
-if(!local){
-  connect_to_socket();
-}
-
 start_exploring();
 
 // Per ora credo siano inutili, quando vuole Gabbo le facciamo esplodere
 if(!local){
-  influx.getLastRound(setRounds);
-  influx.getLastSession(setSession,"");
-}
-
-function send_to_socket(socket_current_mac, session_id, in_session) {
-  let packet = JSON.stringify({
-    diecutter_id : socket_current_mac,
-    session_id : session_id,
-    in_session : in_session
-  });
-
-  console.log("[INFO] INVIATO " + packet);
-
-  if(!local){
-    if(is_connected){
-      try{
-        client.write(packet);
-      }catch(e){
-
-        if(debug){
-          console.log("[ERRORE] Errore nell'invio pacchetti con socket");
-          console.log(e);
-        }
-
-        console.error(e);
-      } 
-    }else{
-      console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
-    }
-  }
-}
-
-/* Wrap the connect function */
-function connect_to_socket(){
-  if(!is_connected){           
-    client.connect(2345, '127.0.0.1', function() {
-      console.log("[INFO] Connected to Python module");
-      is_connected = true;
-      /* Each time python module connects, send to it all the Ruuvi in list */
-      for (let i = 0; i < ruuvi_list.length; i++) {
-        if (ruuvi_list[i].in_session) {
-          send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
-        };
-      }
-    });
+  //influx.getLastRound(setRounds);
+  for(mac in mac_address_list){
+    influx.getLastSession(setSession,mac_address_list[mac]);
+    influx.fixIncompleteSessions(mac_address_list[mac])
   }
 }
 
 function start_exploring() {
+
+  
+  if(!local){
+    connect_to_socket();
+  }
 
   if(debug){
     console.log("[DEBUG] Starting explore...");
@@ -127,10 +88,10 @@ function start_exploring() {
       }else if (state === 'unknown'|| state === 'unauthorized'|| state === 'unsupported'){
         console.log("[ERROR] Adapter in unknown/unauthorized/unsupported state, exiting...");
         process.exit(1);
-      }else if (state === 'poweredOff'){
+      } /* else if (state === 'poweredOff'){
         console.log("[WARN] Adapter Powered off, exiting...");
         process.exit(1);
-      }
+      } */
     });
     
     noble.on('scanStart', function() {
@@ -159,6 +120,7 @@ function start_exploring() {
 
   function on_discovery(peripheral) {
 
+
     clearTimeout(adapter_stuck_timeout);
     adapter_stuck_timeout = setInterval(recover_adapter, 1500000);
 
@@ -170,7 +132,7 @@ function start_exploring() {
     let ruuvi;
     let mac = peripheral.address;
     let rssi = peripheral.rssi;
-    decoded_data = decode(encoded_data.slice(2), mac);
+    let decoded_data = decode(encoded_data.slice(2), mac);
     
     // if no ruuvi packets for 20 minutes, there isn't any ruuvi around
     clearTimeout(no_ruuvi_timeout);
@@ -180,22 +142,19 @@ function start_exploring() {
     * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
     * Otherwise, create a new ruuvi and put it in the list.
     */
-    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data);
+    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["movement_counter"]);
 
     console.log(`mac: ${mac}`);
     console.log(`rounds: ${decoded_data["rounds"]}`);
     console.log(`mov_counter: ${decoded_data["movement_counter"]}`);
 
-    if (new_firmware_mac_list.includes(mac)) {
-      console.log("printing additional debug info:");
-      console.log(`time: ${(new Date()).toLocaleString()}`);
-      console.log(`original speed: ${decoded_data["original_speed"]}`);
-      console.log(`computed_speed: ${decoded_data["speed"]}`);
-      console.log(`input data std: ${decoded_data["input_data_std"]}`);
-      console.log(`max power: ${decoded_data["max_power"]}`);
-      console.log(`freq std: ${decoded_data["freq_std"]}`); 
-    
-    }
+    console.log("printing additional debug info:");
+    console.log(`time: ${(new Date()).toLocaleString()}`);
+    console.log(`true speed: ${decoded_data["original_speed"]}`);
+    console.log(`computed_speed: ${decoded_data["speed"]}`);
+    console.log(`input data std: ${decoded_data["input_data_std"]}`);
+    console.log(`max power: ${decoded_data["max_power"]}`);
+    console.log(`freq std: ${decoded_data["freq_std"]}`); 
 
     console.log(""); 
 
@@ -207,6 +166,7 @@ function start_exploring() {
     ) {
       if (ruuvi.in_session === false) {
         ruuvi.increase_session_id;
+        last_session_map[ruuvi.mac] = last_session_map[ruuvi.mac] + 1
         ruuvi.in_session = true;
       }
     }
@@ -228,8 +188,12 @@ function start_exploring() {
       && ruuvi_mac_in_session[ruuvi.mac] === true) {
 
       if (socket_already_sent[ruuvi.mac] === true) {
+        // write on Influx the ruuvi is not in session anymore
+        decoded_data["in_session"] = ruuvi.in_session;
+        if(!local) influx.write(decoded_data);
+
         ruuvi_mac_in_session[ruuvi.mac] = false;
-        socket_already_sent[ruuvi.mac] = false;
+        socket_already_sent[ruuvi.mac] = false;      
         send_to_socket(ruuvi.mac, ruuvi.session_id, ruuvi.in_session);
         console.log("[INFO] Sessione terminata per "+ ruuvi.mac)
       }
@@ -247,6 +211,7 @@ function start_exploring() {
     if (ruuvi.in_session === true) {
         
       decoded_data["session_id"] = ruuvi.session_id;
+      decoded_data["in_session"] = ruuvi.in_session;
 
       if(!local){
         try{
@@ -305,12 +270,13 @@ function start_exploring() {
   
   function create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter) {
     let kf = new KalmanFilter({R: R, Q: Q});
-    let ruuvi = new RuuviTag(mac, rssi, false, 0, 0, mov_counter, kf);
+    let ruuvi = new RuuviTag(mac, rssi, false, last_session_map[mac], 0, mov_counter, kf);
+    console.log("Created Ruuuvi "+mac+" with sid = "+last_session_map[mac])
     ruuvi_list.push(ruuvi);
     return ruuvi;
   }
    
-  function update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data) {
+  function update_or_create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter){
 
     for (let i = 0; i < ruuvi_list.length; i++) {
       
@@ -319,44 +285,11 @@ function start_exploring() {
         let selected_ruuvi = ruuvi_list[i];
         selected_ruuvi.rssi = selected_ruuvi.kalman.filter(rssi);
         
-        let current_rotations = decoded_data["rounds"];
-        let current_raw_session = decoded_data["movement_counter"];
-        let current_timestamp = new Date();
-
-        if (current_raw_session > 0 && 
-            current_raw_session === selected_ruuvi.prev_raw_session){
-          // recompute "current_rotations" variable and
-          // update "rounds" field in "decoded_data" object
-          
-          let current_speed = decoded_data["speed"];
-
-          current_rotations = compute_rotations(selected_ruuvi.prev_timestamp,
-                                                current_timestamp,
-                                                current_speed, 
-                                                selected_ruuvi.prev_rotations);
-
-          decoded_data["rounds"] = current_rotations;
-        }
-
-        // update prev variables
-        selected_ruuvi.prev_raw_session = current_raw_session;
-        selected_ruuvi.prev_rotations = current_rotations;
-        selected_ruuvi.prev_timestamp = current_timestamp;
-        
         return selected_ruuvi;
       };
     }
 
-    return create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["mov_counter"]);
-  }
-
-
-  function compute_rotations(prev_date, curr_date, speed, previous_rotations){
-    let time_diff = (curr_date - prev_date)/1000;
-    let new_rotations = time_diff * speed;
-    let total_rotations = Math.round(previous_rotations + new_rotations);
-    
-    return total_rotations;
+    return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
   }
   
   function decode(data, mac) {
@@ -371,16 +304,11 @@ function start_exploring() {
     ble_packet["humidity"] = data.slice(3, 5).readUInt16BE() / 400;
 
     // parse debug data
-    if (new_firmware_mac_list.includes(mac)) {
-      
-      ble_packet["new_session_id"] = data.slice(7,9).readInt16BE();
-      ble_packet["original_speed"] = data.slice(9,11).readInt16BE() / 1000;
-      ble_packet["input_data_std"] = data.slice(11,13).readInt16BE() / 1000;
-      ble_packet["max_power"] = data.slice(13,15).readInt16BE();
-      ble_packet["freq_std"] = data.slice(16,18).readUInt16BE() / 1000;
-    }
-  
-    ble_packet["movement_counter"] = data.slice(15,16).readUInt8();
+    ble_packet["movement_counter"] = data.slice(7,9).readInt16BE();
+    ble_packet["original_speed"] = data.slice(9,11).readInt16BE() / 1000;
+    ble_packet["input_data_std"] = data.slice(11,13).readInt16BE() / 1000;
+    ble_packet["max_power"] = data.slice(13,15).readInt16BE();
+    ble_packet["freq_std"] = data.slice(16,18).readUInt16BE() / 1000;
 
     // parse rotation related data
     ble_packet["speed"] = data.slice(5, 7).readUInt16BE() / 1000;
@@ -442,34 +370,93 @@ function start_exploring() {
 
 }
 
-function setRounds(result){
-  last_round_value = result;
-}
-
-function setSession(result){
-  session_id = result;
-}
-
 /* socket exception handling*/
 client.on('error', function(err){
-
   is_connected = false;
   if(debug){
     console.log("[ERRORE] Errore Client")
   }
   console.log(err);
-  sleep(5000).then(() => {
-    // Connect back again after the 5s sleep!
+
+  for (let i = 0; i < ruuvi_list.length; i++) {
+    if (ruuvi_list[i].mac in socket_already_sent && socket_already_sent[ruuvi_list[i].mac] === true) {
+      socket_already_sent[ruuvi_list[i].mac] = false;
+    }
+  }
+
+});
+
+client.on('close', function(err) {
+  sleep(10000).then(() => {
+    // Connect back again after the 10s sleep!
     if(debug){
       console.log("[DEBUG] Provo a connettermi di nuovo")
     }
     connect_to_socket();
   });
-});
- 
+})
+
+client.on('connect', function() {
+  is_connected = true;
+  /* Each time python module connects, send to it all the Ruuvi in list */
+  console.log("[INFO] Modulo Python connesso, invio i Ruuvi in sessione ");
+  for (let i = 0; i < ruuvi_list.length; i++) {
+    if (ruuvi_list[i].in_session && socket_already_sent[ruuvi_list[i].mac] === false) {
+      send_to_socket(ruuvi_list[i].mac, ruuvi_list[i].session_id, ruuvi_list[i].in_session)
+      socket_already_sent[ruuvi_list[i].mac] = true
+    };
+  }
+})
+
+/* Wrap the connect function */
+function connect_to_socket(){
+  if(!is_connected){           
+    client.connect(2345, '127.0.0.1');
+  }
+}
+
+function send_to_socket(socket_current_mac, session_id, in_session) {
+  let packet = JSON.stringify({
+    diecutter_id : socket_current_mac,
+    session_id : session_id,
+    in_session : in_session
+  });
+
+  console.log("[INFO] INVIATO " + packet);
+
+  if(!local){
+    if(is_connected){
+      try{
+        client.write(packet);
+      }catch(e){
+
+        if(debug){
+          console.log("[ERRORE] Errore nell'invio pacchetti con socket");
+          console.log(e);
+        }
+
+        console.error(e);
+      } 
+    }else{
+      console.log("[WARN] Ho provato a mandare dati alla socket ma non sono connesso")
+    }
+  }
+}
+
+
+
 /* sleep utility function */
 function sleep (time) {
   return new Promise((resolve) => setTimeout(resolve, time));
+}
+
+function setRounds(result){
+  last_round_value = result;
+}
+
+function setSession(result,mac){
+  console.log("[INFO] "+mac+" last session_id: "+result)
+  last_session_map[mac] = result;
 }
 
 /* maybe unhandled promises detector will help debugging? */

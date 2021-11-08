@@ -10,6 +10,7 @@ const influx = new Influx.InfluxDB({
           mac: Influx.FieldType.STRING,
           rounds: Influx.FieldType.INTEGER,
           session_id: Influx.FieldType.INTEGER,
+          in_session: Influx.FieldType.BOOLEAN,
           temperature: Influx.FieldType.FLOAT,
           humidity: Influx.FieldType.FLOAT,
           speed: Influx.FieldType.FLOAT
@@ -29,6 +30,7 @@ function write(data) {
               mac: data['mac'],
               rounds: data['rounds'],
               session_id: data['session_id'],
+              in_session: data['in_session'],
               temperature: data['temperature'],
               humidity: data['humidity'],
               speed: data['speed']
@@ -40,14 +42,51 @@ function write(data) {
 }
 
 function getLastSession(callback,mac) {
-  influx.query('select last(session_id) from ruuvi where mac =' + mac +' order by desc limit 1').catch(err=>{
+  influx.query('select last(session_id) from ruuvi where mac =\'' + mac + '\'').catch(err=>{
       console.log(err);
     })
     .then(results=>{
       if(results.length > 0)
-        callback(results[0].last);
+        callback(results[0].last,mac);
       else
-        callback(0);
+        callback(-1,mac);
+    });
+}
+
+
+function fixIncompleteSessions(mac) {
+  influx.query('select * from ruuvi where mac =\'' + mac + '\' order by time desc limit 1').catch(err=>{
+      console.log(err);
+    })
+    .then(results=>{
+      
+      if(results.length > 0){
+        if(results[0].in_session == true){
+          console.log("[WARNING] "+mac+" has NOT correctly finished the session")
+          influx.writePoints([
+              {
+                  measurement: 'ruuvi',
+                  timestamp: results[0].time,
+                  fields: {   
+                    mac: mac,
+                    rounds: results[0].rounds,
+                    session_id: results[0].session_id,
+                    in_session: false,
+                    temperature: results[0].temperature,
+                    humidity: results[0].humidity,
+                    speed: results[0].speed
+                  }
+              }
+          ], {
+              database: 'rotalaser'
+          });
+        }else{
+          console.log("[INFO] "+mac+" has correctly finished the session")
+        }
+        
+      }
+      else
+        console.log("[WARNING] Unable to find last in_session for " + mac)
     });
 }
 
@@ -66,5 +105,6 @@ function getLastRound(callback) {
 module.exports = {
   write,
   getLastSession,
-  getLastRound
+  getLastRound,
+  fixIncompleteSessions
 }
