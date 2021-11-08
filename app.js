@@ -189,6 +189,7 @@ function start_exploring() {
 
       if (socket_already_sent[ruuvi.mac] === true) {
         // write on Influx the ruuvi is not in session anymore
+        decoded_data["session_id"] = ruuvi.session_id;
         decoded_data["in_session"] = ruuvi.in_session;
         if(!local) influx.write(decoded_data);
 
