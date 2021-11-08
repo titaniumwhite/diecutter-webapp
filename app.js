@@ -43,7 +43,7 @@ start_exploring();
 
 // Per ora credo siano inutili, quando vuole Gabbo le facciamo esplodere
 if(!local){
-  influx.getLastRound(setRounds);
+  //influx.getLastRound(setRounds);
   for(mac in mac_address_list){
     influx.getLastSession(setSession,mac_address_list[mac]);
     influx.fixIncompleteSessions(mac_address_list[mac])
