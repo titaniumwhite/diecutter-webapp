@@ -10,8 +10,8 @@ const influx = new Influx.InfluxDB({
           mac: Influx.FieldType.STRING,
           rounds: Influx.FieldType.INTEGER,
           session_id: Influx.FieldType.INTEGER,
-          temperature: Influx.FieldType.INTEGER,
-          humidity: Influx.FieldType.INTEGER,
+          temperature: Influx.FieldType.FLOAT,
+          humidity: Influx.FieldType.FLOAT,
           speed: Influx.FieldType.FLOAT
         },
         tags: [
