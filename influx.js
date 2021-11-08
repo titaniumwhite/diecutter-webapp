@@ -61,7 +61,7 @@ function fixIncompleteSessions(mac) {
     .then(results=>{
       
       if(results.length > 0){
-        if(results[0].in_session == 'true'){
+        if(results[0].in_session == true){
           console.log("[WARNING] "+mac+" has NOT correctly finished the session")
           influx.writePoints([
               {
@@ -70,6 +70,7 @@ function fixIncompleteSessions(mac) {
                   fields: {   
                     mac: mac,
                     rounds: results[0].rounds,
+                    session_id: results[0].session_id,
                     in_session: false,
                     temperature: results[0].temperature,
                     humidity: results[0].humidity,
@@ -86,21 +87,6 @@ function fixIncompleteSessions(mac) {
       }
       else
         console.log("[WARNING] Unable to find last in_session for " + mac)
-         influx.writePoints([
-              {
-                  measurement: 'ruuvi',
-                  fields: { 
-                    mac: mac,
-                    rounds: 0,
-                    in_session: false,
-                    temperature: 0.0,
-                    humidity: 0,
-                    speed: 0
-                  }
-              }
-          ], {
-              database: 'rotalaser'
-          });
     });
 }
 
