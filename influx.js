@@ -66,7 +66,7 @@ function fixIncompleteSessions(mac) {
           influx.writePoints([
               {
                   measurement: 'ruuvi',
-                  time: results[0].time,
+                  timestamp: results[0].time,
                   fields: {   
                     mac: mac,
                     rounds: results[0].rounds,
