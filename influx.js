@@ -2,7 +2,7 @@ const Influx = require('influx');
 
 const influx = new Influx.InfluxDB({
     host: 'localhost',
-    database: 'rotalaser',
+    database: 'rotalaserdb',
     schema: [
       {
         measurement: 'ruuvi',
