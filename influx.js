@@ -37,7 +37,7 @@ function write(data) {
             }
         }
     ], {
-        database: 'rotalaser'
+        database: 'rotalaserdb'
     });
 }
 
@@ -78,7 +78,7 @@ function fixIncompleteSessions(mac) {
                   }
               }
           ], {
-              database: 'rotalaser'
+              database: 'rotalaserdb'
           });
         }else{
           console.log("[INFO] "+mac+" has correctly finished the session")
