@@ -334,6 +334,9 @@ function start_exploring() {
   function no_ruuvi_around() {
     console.log("[INFO] No RuuviTag around.");
     clearInterval(no_ruuvi_timeout);
+    for(mac in mac_address_list){
+      influx.fixIncompleteSessions(mac_address_list[mac])
+    }
     first_ruuvi_packet = true;
   }
   
