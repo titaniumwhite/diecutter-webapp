@@ -30,7 +30,7 @@ let ruuvi_list = [];
 
 
 let mac_address_list = ["da:5b:93:12:58:30","ee:ea:4b:24:65:33","c7:02:8f:47:f2:0d","d5:65:e4:a8:89:60", 
-                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73"]
+                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73", "d4:30:15:4a:ab:2d"];
 let last_session_map = {}
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
