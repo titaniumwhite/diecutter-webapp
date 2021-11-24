@@ -49,7 +49,7 @@ function getLastSession(callback,mac) {
       if(results.length > 0)
         callback(results[0].last,mac);
       else
-        callback(-1,mac);
+        callback(0, mac);
     });
 }
 
