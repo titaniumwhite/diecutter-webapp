@@ -11,13 +11,7 @@ const noble = require('@abandonware/noble');
 const influx = require('./influx');
 const RuuviTag = require('./ruuvitag');
 const net = require('net');
-const KalmanFilter = require('kalmanjs');
 
-// Kalman Settings
-const R = 0.01;
-const Q = 3;
-
-let temporary_list = [];
 let no_ruuvi_timeout; // if there are no ruuvi packets for 20 minutes, there isn't any ruuvitag around
 let adapter_stuck_timeout; // if there are no bluetooth packets for 25 minutes, the bluetooth adapter is stuck
 let first_ruuvi_packet = true; // boolean to check whether it is the first packet received 
@@ -30,7 +24,7 @@ let ruuvi_list = [];
 
 
 let mac_address_list = ["da:5b:93:12:58:30","ee:ea:4b:24:65:33","c7:02:8f:47:f2:0d","d5:65:e4:a8:89:60", 
-                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73", "d4:30:15:4a:ab:2d"];
+                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73"]
 let last_session_map = {}
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
@@ -52,7 +46,6 @@ if(!local){
 
 function start_exploring() {
 
-  
   if(!local){
     connect_to_socket();
   }
@@ -139,10 +132,10 @@ function start_exploring() {
     no_ruuvi_timeout = setTimeout(no_ruuvi_around, 1200000);
 
     /*
-    * If ruuvi is already in ruuvi_list, update the rssi by the Kalman Filter.
+    * If ruuvi is already in ruuvi_list, take it.
     * Otherwise, create a new ruuvi and put it in the list.
     */
-    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["rounds"], decoded_data["movement_counter"]);
+    ruuvi = update_or_create_ruuvi(ruuvi_list, mac, rssi, decoded_data["movement_counter"]);
 
     console.log(`mac: ${mac}`);
     console.log(`rounds: ${decoded_data["rounds"]}`);
@@ -189,7 +182,6 @@ function start_exploring() {
 
       if (socket_already_sent[ruuvi.mac] === true) {
         // write on Influx the ruuvi is not in session anymore
-        decoded_data["session_id"] = ruuvi.session_id;
         decoded_data["in_session"] = ruuvi.in_session;
         if(!local) influx.write(decoded_data);
 
@@ -270,28 +262,21 @@ function start_exploring() {
     return closer_ruuvi;
   }
   
-  function create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter) {
-    let kf = new KalmanFilter({R: R, Q: Q});
-    let ruuvi = new RuuviTag(mac, rssi, false, last_session_map[mac], 0, mov_counter, kf);
-    console.log("Created Ruuuvi "+mac+" with sid = "+last_session_map[mac])
+  function create_ruuvi(ruuvi_list, mac, rssi, mov_counter) {
+    let ruuvi = new RuuviTag(mac, rssi, false, last_session_map[mac], mov_counter);
     ruuvi_list.push(ruuvi);
     return ruuvi;
   }
    
-  function update_or_create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter){
+  function update_or_create_ruuvi(ruuvi_list, mac, rssi, mov_counter){
 
-    for (let i = 0; i < ruuvi_list.length; i++) {
-      
+    for (let i = 0; i < ruuvi_list.length; i++) {     
       if (mac == ruuvi_list[i].mac) {
-
-        let selected_ruuvi = ruuvi_list[i];
-        selected_ruuvi.rssi = selected_ruuvi.kalman.filter(rssi);
-        
-        return selected_ruuvi;
+        return ruuvi_list[i];
       };
     }
 
-    return create_ruuvi(ruuvi_list, mac, rssi, rounds, mov_counter);
+    return create_ruuvi(ruuvi_list, mac, rssi, mov_counter);
   }
   
   function decode(data, mac) {
@@ -335,9 +320,6 @@ function start_exploring() {
   function no_ruuvi_around() {
     console.log("[INFO] No RuuviTag around.");
     clearInterval(no_ruuvi_timeout);
-    for(mac in mac_address_list){
-      influx.fixIncompleteSessions(mac_address_list[mac])
-    }
     first_ruuvi_packet = true;
   }
   
@@ -349,28 +331,6 @@ function start_exploring() {
                       ble_raw_data[2] == 5);
   
     return is_ruuvi_packet;
-  }
-  
-  function update_temporary_list(array, value) {
-    if (array.indexOf(value) === -1)
-      array.push(value)
-  }
-  
-  /*
-  * If the objects in the dictionary are greater than the items in the list,
-  * delete the objects in the dictionary that are not in the list.
-  * Aftet that, make the list empty.
-  */
-  function update_ruuvi_list() {
-    if (ruuvi_list.length > temporary_list.length) {
-      for (let i = 0; i < ruuvi_list.length; i++) {
-        if (temporary_list.indexOf(ruuvi_list[i].mac) === -1) {
-          ruuvi_list.splice(i, 1);
-          i--;
-        }
-      }
-    }
-    temporary_list = [];
   }
 
 }
