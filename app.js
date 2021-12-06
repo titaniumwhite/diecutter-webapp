@@ -24,7 +24,8 @@ let ruuvi_list = [];
 
 
 let mac_address_list = ["da:5b:93:12:58:30","ee:ea:4b:24:65:33","c7:02:8f:47:f2:0d","d5:65:e4:a8:89:60", 
-                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73"]
+                        "d7:05:4d:e8:6a:f9","c2:f3:33:08:5a:2f","da:bc:6e:d4:80:73", "d4:30:15:4a:ab:2d",
+                        "ce:15:06:5f:7d:84", "eb:c2:54:81:1b:15", "d5:ad:35:8a:cb:d1"]
 let last_session_map = {}
 /*
 * Commento da Marco: ma in che lingua scriviamo? Ahahahah
@@ -182,6 +183,7 @@ function start_exploring() {
 
       if (socket_already_sent[ruuvi.mac] === true) {
         // write on Influx the ruuvi is not in session anymore
+        decoded_data["session_id"] = ruuvi.session_id;
         decoded_data["in_session"] = ruuvi.in_session;
         if(!local) influx.write(decoded_data);
 
@@ -319,6 +321,9 @@ function start_exploring() {
   function no_ruuvi_around() {
     console.log("[INFO] No RuuviTag around.");
     clearInterval(no_ruuvi_timeout);
+    for(mac in mac_address_list){
+      influx.fixIncompleteSessions(mac_address_list[mac])
+    }
     first_ruuvi_packet = true;
   }
   
