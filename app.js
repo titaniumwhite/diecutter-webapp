@@ -229,6 +229,7 @@ function start_exploring() {
   }
 
   function end_session(ruuvi) {
+    console.log("[INFO] End session di "+ ruuvi.mac);
     ruuvi.in_session = false;
     ruuvi_mac_in_session[ruuvi.mac] = false;
 
