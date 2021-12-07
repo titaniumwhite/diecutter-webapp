@@ -239,6 +239,8 @@ function start_exploring() {
       socket_already_sent[ruuvi.mac] = false;
     }
 
+    // set in_session=false for this ruuvi
+    influx.fixIncompleteSessions(ruuvi.mac);
   }
 
   function no_ruuvi_in_session() {
